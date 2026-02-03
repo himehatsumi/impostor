@@ -1,7 +1,3 @@
-Got it — here’s a **clean, professional, open-source–style rewrite**, trimmed to just the essentials and written like a real project README. No fluff, no emojis, no marketing hype.
-
----
-
 # Impostor
 
 **Online Multiplayer Word Deduction Game**
