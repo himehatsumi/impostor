@@ -116,6 +116,54 @@ const WORDS = [
   { word: 'chair', theme: 'legs', category: 'everyday' },
   { word: 'blanket', theme: 'soft', category: 'everyday' },
   { word: 'puzzle', theme: 'pieces', category: 'games' },
+
+  // --- Abstract ---
+  { word: 'freedom', theme: 'choice', category: 'abstract' },
+  { word: 'trust', theme: 'belief', category: 'abstract' },
+  { word: 'fear', theme: 'danger', category: 'abstract' },
+  { word: 'luck', theme: 'chance', category: 'abstract' },
+  { word: 'justice', theme: 'fair', category: 'abstract' },
+  { word: 'memory', theme: 'past', category: 'abstract' },
+  { word: 'dream', theme: 'sleep', category: 'abstract' },
+  { word: 'power', theme: 'control', category: 'abstract' },
+  { word: 'silence', theme: 'absence', category: 'abstract' },
+  { word: 'chaos', theme: 'disorder', category: 'abstract' },
+
+  // --- Places ---
+  { word: 'library', theme: 'quiet', category: 'place' },
+  { word: 'airport', theme: 'travel', category: 'place' },
+  { word: 'stadium', theme: 'crowd', category: 'place' },
+  { word: 'museum', theme: 'history', category: 'place' },
+  { word: 'playground', theme: 'fun', category: 'place' },
+  { word: 'hospital', theme: 'care', category: 'place' },
+  { word: 'restaurant', theme: 'menu', category: 'place' },
+  { word: 'beach', theme: 'sand', category: 'place' },
+  { word: 'mountain', theme: 'high', category: 'place' },
+  { word: 'theater', theme: 'stage', category: 'place' },
+
+  // --- Actions ---
+  { word: 'whisper', theme: 'quiet', category: 'action' },
+  { word: 'sprint', theme: 'fast', category: 'action' },
+  { word: 'stretch', theme: 'flexible', category: 'action' },
+  { word: 'balance', theme: 'steady', category: 'action' },
+  { word: 'celebrate', theme: 'happy', category: 'action' },
+  { word: 'explore', theme: 'discover', category: 'action' },
+  { word: 'guess', theme: 'uncertain', category: 'action' },
+  { word: 'escape', theme: 'freedom', category: 'action' },
+  { word: 'observe', theme: 'watch', category: 'action' },
+  { word: 'imagine', theme: 'creative', category: 'action' },
+
+  // --- Objects ---
+  { word: 'umbrella', theme: 'rain', category: 'object' },
+  { word: 'flashlight', theme: 'dark', category: 'object' },
+  { word: 'mirror', theme: 'reflection', category: 'object' },
+  { word: 'backpack', theme: 'carry', category: 'object' },
+  { word: 'key', theme: 'unlock', category: 'object' },
+  { word: 'ladder', theme: 'climb', category: 'object' },
+  { word: 'pillow', theme: 'sleep', category: 'object' },
+  { word: 'scissors', theme: 'cut', category: 'object' },
+  { word: 'calendar', theme: 'days', category: 'object' },
+  { word: 'clock', theme: 'time', category: 'object' },
 ];
 
 function getRandomWord() {
