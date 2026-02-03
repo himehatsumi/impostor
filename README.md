@@ -24,6 +24,7 @@ Impostor is a lightweight full-stack multiplayer word game inspired by social de
 
   * Crewmates win if the impostor is voted out
   * Impostor wins if they survive 4 rounds
+  * Impostor wins if they guess the word
 * **Scoring:**
 
   * Scores persist across rounds within the same room
