@@ -166,10 +166,95 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.room-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .room-code {
   font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.12em;
+}
+
+.icon-btn, .text-btn {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  cursor: pointer;
+}
+
+.icon-btn:hover, .text-btn:hover {
+  color: var(--accent);
+}
+
+.app-header {
+  position: relative;
+}
+
+.app-header .text-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+}
+
+.modal-content p {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.modal-content .primary {
+  margin-top: 12px;
+}
+
+.sound-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sound-toggle input {
+  width: auto;
 }
 
 .round-info {
@@ -255,6 +340,24 @@ button:disabled {
   color: var(--text-muted);
 }
 
+.impostor-guess {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.impostor-guess-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.impostor-guess-form input {
+  flex: 1;
+  min-width: 0;
+}
+
 .waiting-phase {
   padding: 8px 0;
 }
@@ -324,6 +427,22 @@ button:disabled {
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 0.85rem;
+}
+
+#opt-custom-words {
+  margin-top: 4px;
+  min-height: 44px;
+  font-size: 0.85rem;
+}
+
+.player-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.player-actions button {
+  padding: 2px 6px;
+  font-size: 0.75rem;
 }
 
 .players-list {

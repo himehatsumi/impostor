@@ -12,6 +12,7 @@
     <div id="app">
       <header class="app-header">
         <h1>Impostor</h1>
+        <button type="button" id="how-to-play-btn" class="text-btn">How to play</button>
       </header>
 
       <main class="app-main">
@@ -34,11 +35,19 @@
         <!-- Game -->
         <section id="game-screen" class="card hidden">
           <div class="room-header">
-            <span id="room-code-display" class="room-code"></span>
+            <div class="room-code-row">
+              <span id="room-code-display" class="room-code"></span>
+              <button type="button" id="copy-code-btn" class="icon-btn" title="Copy code">Copy</button>
+              <span id="leave-room-btn" class="text-btn">Leave</span>
+            </div>
             <div class="round-info">
               <span id="round-label"></span>
               <span id="phase-label" class="phase-label"></span>
               <span id="phase-timer" class="phase-timer hidden"></span>
+              <label class="sound-toggle">
+                <input type="checkbox" id="sound-mute" />
+                <span>Sound</span>
+              </label>
             </div>
           </div>
 
@@ -50,6 +59,13 @@
                 <p id="role-label" class="role-label">Waiting...</p>
                 <p id="secret-word" class="secret-word"></p>
                 <p id="secret-theme" class="secret-theme"></p>
+                <div id="impostor-guess-area" class="impostor-guess hidden">
+                  <button type="button" id="impostor-guess-btn" class="secondary small">I know the word!</button>
+                  <div id="impostor-guess-form" class="hidden">
+                    <input type="text" id="impostor-guess-input" placeholder="Enter the word" />
+                    <button type="button" id="impostor-guess-submit" class="primary small">Guess</button>
+                  </div>
+                </div>
               </section>
 
               <section class="panel action-panel">
@@ -121,6 +137,10 @@
                       <option value="90">90</option>
                     </select>
                   </div>
+                  <div class="option-row">
+                    <label for="opt-custom-words">Custom words (optional)</label>
+                  </div>
+                  <textarea id="opt-custom-words" rows="2" placeholder="Comma or newline separated, e.g. pizza, dog, moon"></textarea>
                 </div>
                 <ul id="players-list" class="players-list"></ul>
               </section>
@@ -139,6 +159,18 @@
       <footer class="app-footer">
         <p>Impostor — word game</p>
       </footer>
+
+      <div id="how-to-play-modal" class="modal hidden" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <h2>How to play</h2>
+          <p><strong>Roles:</strong> Everyone gets the same secret word except one <strong>Impostor</strong>, who gets a related clue instead.</p>
+          <p><strong>Clues:</strong> Each round has two clue phases. Give a short clue about the word without saying it. The impostor tries to blend in.</p>
+          <p><strong>Voting:</strong> After clues, everyone votes for who they think is the impostor, or Skip to eliminate no one.</p>
+          <p><strong>Winning:</strong> Crewmates win by voting out the impostor. The impostor wins by surviving all rounds.</p>
+          <button type="button" id="how-to-play-close" class="primary">Got it</button>
+        </div>
+      </div>
     </div>
 
     <script src="client.js"></script>

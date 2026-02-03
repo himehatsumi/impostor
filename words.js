@@ -122,6 +122,13 @@ function getRandomWord() {
   return WORDS[Math.floor(Math.random() * WORDS.length)];
 }
 
+function getRandomWordFromList(wordStrings) {
+  if (!wordStrings || wordStrings.length === 0) return null;
+  const word = wordStrings[Math.floor(Math.random() * wordStrings.length)].trim();
+  if (!word) return getRandomWordFromList(wordStrings.filter(Boolean));
+  return { word, theme: 'Custom', category: null };
+}
+
 // Basic impostor clue generator.
 // It returns a clue that is related but not identical.
 // You can plug in an AI model here to generate smarter clues.
@@ -145,6 +152,7 @@ function generateImpostorClue(entry) {
 module.exports = {
   WORDS,
   getRandomWord,
+  getRandomWordFromList,
   generateImpostorClue,
 };
 

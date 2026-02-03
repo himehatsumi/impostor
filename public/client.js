@@ -18,9 +18,10 @@ let state = {
   secretWord: null,
   secretTheme: null,
   impostorClue: null,
-  options: { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0 },
+  options: { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: '' },
   timerEndAt: null,
   timerInterval: null,
+  wasHost: false,
 };
 
 // Elements
@@ -61,6 +62,18 @@ const optClueTime = document.getElementById('opt-clue-time');
 const optVoteTime = document.getElementById('opt-vote-time');
 const phaseTimerEl = document.getElementById('phase-timer');
 const waitingPhaseEl = document.getElementById('waiting-phase');
+const copyCodeBtn = document.getElementById('copy-code-btn');
+const leaveRoomBtn = document.getElementById('leave-room-btn');
+const howToPlayBtn = document.getElementById('how-to-play-btn');
+const howToPlayModal = document.getElementById('how-to-play-modal');
+const howToPlayClose = document.getElementById('how-to-play-close');
+const soundMuteCheckbox = document.getElementById('sound-mute');
+const optCustomWords = document.getElementById('opt-custom-words');
+const impostorGuessArea = document.getElementById('impostor-guess-area');
+const impostorGuessBtn = document.getElementById('impostor-guess-btn');
+const impostorGuessForm = document.getElementById('impostor-guess-form');
+const impostorGuessInput = document.getElementById('impostor-guess-input');
+const impostorGuessSubmit = document.getElementById('impostor-guess-submit');
 
 // Helper UI functions
 function isMeAlive() {
@@ -89,6 +102,70 @@ function setLobbyError(message) {
   lobbyError.textContent = message || '';
 }
 
+function isSoundEnabled() {
+  return soundMuteCheckbox && !soundMuteCheckbox.checked;
+}
+
+function getAudioContext() {
+  if (!window.__impostorAudioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) window.__impostorAudioCtx = new Ctx();
+  }
+  return window.__impostorAudioCtx;
+}
+
+function unlockAudio() {
+  if (window.__impostorAudioUnlocked) return;
+  window.__impostorAudioUnlocked = true;
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+}
+
+document.addEventListener('click', unlockAudio, { once: true });
+document.addEventListener('keydown', unlockAudio, { once: true });
+document.addEventListener('touchstart', unlockAudio, { once: true });
+
+function playSound(kind) {
+  if (!isSoundEnabled()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const play = () => {
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      if (kind === 'alert') {
+        osc.frequency.setValueAtTime(400, ctx.currentTime);
+        osc.frequency.setValueAtTime(300, ctx.currentTime + 0.1);
+      } else {
+        osc.frequency.setValueAtTime(523, ctx.currentTime);
+        osc.frequency.setValueAtTime(659, ctx.currentTime + 0.08);
+      }
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.2);
+    } catch (_) {}
+  };
+
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(play).catch(() => {});
+  } else {
+    play();
+  }
+}
+
+function copyRoomCode() {
+  if (!state.roomCode) return;
+  navigator.clipboard.writeText(state.roomCode).then(() => {
+    const t = copyCodeBtn.textContent;
+    copyCodeBtn.textContent = 'Copied!';
+    setTimeout(() => { copyCodeBtn.textContent = t; }, 1500);
+  });
+}
+
 function clearTimerDisplay() {
   if (state.timerInterval) {
     clearInterval(state.timerInterval);
@@ -104,6 +181,7 @@ function startTimerDisplay(endAt, durationSeconds) {
   if (!durationSeconds || durationSeconds <= 0) return;
 
   state.timerEndAt = endAt;
+  state.timerLowPlayed = false;
 
   function tick() {
     const now = Date.now();
@@ -111,6 +189,10 @@ function startTimerDisplay(endAt, durationSeconds) {
     if (left <= 0) {
       clearTimerDisplay();
       return;
+    }
+    if (left <= 5 && !state.timerLowPlayed) {
+      state.timerLowPlayed = true;
+      playSound('alert');
     }
     phaseTimerEl.classList.remove('hidden');
     phaseTimerEl.classList.toggle('warning', left <= 10);
@@ -150,6 +232,11 @@ function updateRoomState(payload) {
   const me = state.players.find((p) => p.id === state.playerId);
   const isHost = me && me.isHost;
 
+  if (isHost && !state.wasHost && state.roomCode) {
+    logStatus('You are now the host.');
+  }
+  state.wasHost = isHost;
+
   startGameBtn.classList.toggle(
     'hidden',
     !(isHost && (payload.phase === 'lobby' || payload.phase === 'gameover')),
@@ -163,6 +250,7 @@ function updateRoomState(payload) {
     optMaxRounds.value = String(payload.options.maxRounds ?? 3);
     optClueTime.value = String(payload.options.clueTimeLimit ?? 0);
     optVoteTime.value = String(payload.options.voteTimeLimit ?? 0);
+    if (optCustomWords) optCustomWords.value = payload.options.customWords || '';
   }
 
   // Show clue/ack/voting only when game has started; otherwise show waiting.
@@ -175,6 +263,18 @@ function updateRoomState(payload) {
     submitClueBtn.disabled = true;
   } else {
     waitingPhaseEl.classList.add('hidden');
+  }
+
+  const showImpostorGuess =
+    state.role === 'impostor' &&
+    (payload.phase === 'clue' || payload.phase === 'ack' || payload.phase === 'voting') &&
+    isMeAlive();
+  if (impostorGuessArea) {
+    impostorGuessArea.classList.toggle('hidden', !showImpostorGuess);
+    if (!showImpostorGuess && impostorGuessForm) {
+      impostorGuessForm.classList.add('hidden');
+      if (impostorGuessInput) impostorGuessInput.value = '';
+    }
   }
 
   renderPlayers();
@@ -205,6 +305,12 @@ function renderPlayers() {
       main.appendChild(tag);
     }
 
+    if (p.disconnected) {
+      const tag = document.createElement('span');
+      tag.className = 'player-tag';
+      tag.textContent = 'Reconnecting…';
+      main.appendChild(tag);
+    }
     if (!p.alive && state.phase !== 'lobby') {
       const tag = document.createElement('span');
       tag.className = 'player-tag dead';
@@ -215,11 +321,39 @@ function renderPlayers() {
     row.appendChild(main);
 
     const right = document.createElement('div');
+    right.className = 'player-right';
 
     const score = document.createElement('div');
     score.className = 'player-score';
     score.textContent = `Score: ${p.score}`;
     right.appendChild(score);
+
+    const me = state.players.find((x) => x.id === state.playerId);
+    const isHost = me && me.isHost;
+    if (p.id !== state.playerId && (state.phase === 'lobby' || state.phase === 'gameover')) {
+      const actions = document.createElement('div');
+      actions.className = 'player-actions';
+      if (isHost) {
+        const kickBtn = document.createElement('button');
+        kickBtn.type = 'button';
+        kickBtn.className = 'text-btn';
+        kickBtn.textContent = 'Kick';
+        kickBtn.addEventListener('click', () => {
+          if (state.roomCode) socket.emit('kickPlayer', { roomCode: state.roomCode, targetId: p.id });
+        });
+        actions.appendChild(kickBtn);
+      }
+      const reportBtn = document.createElement('button');
+      reportBtn.type = 'button';
+      reportBtn.className = 'text-btn';
+      reportBtn.textContent = 'Report';
+      reportBtn.addEventListener('click', () => {
+        if (state.roomCode) socket.emit('reportPlayer', { roomCode: state.roomCode, targetId: p.id });
+        logStatus(`Reported ${p.name}.`);
+      });
+      actions.appendChild(reportBtn);
+      right.appendChild(actions);
+    }
 
     // During voting, show who each player voted for (if they voted yet).
     if (state.phase === 'voting') {
@@ -477,8 +611,11 @@ joinBtn.addEventListener('click', () => {
     state.playerId = res.playerId;
     state.roomCode = res.roomCode;
     showGame();
-    logStatus(`Joined room ${res.roomCode}. Waiting for the host to start.`);
-
+    if (res.rejoined) {
+      logStatus('Reconnected to the room.');
+    } else {
+      logStatus(`Joined room ${res.roomCode}. Waiting for the host to start.`);
+    }
     socket.emit('requestRoomState', { roomCode: res.roomCode });
   });
 });
@@ -497,12 +634,14 @@ startBotsGameBtn.addEventListener('click', () => {
 
 function emitRoomOptions() {
   if (!state.roomCode) return;
+  const customWords = (optCustomWords && optCustomWords.value) ? optCustomWords.value.trim() : '';
   socket.emit('setRoomOptions', {
     roomCode: state.roomCode,
     options: {
       maxRounds: parseInt(optMaxRounds.value, 10) || 3,
       clueTimeLimit: parseInt(optClueTime.value, 10) || 0,
       voteTimeLimit: parseInt(optVoteTime.value, 10) || 0,
+      customWords: customWords,
     },
   });
 }
@@ -510,6 +649,84 @@ function emitRoomOptions() {
 optMaxRounds.addEventListener('change', emitRoomOptions);
 optClueTime.addEventListener('change', emitRoomOptions);
 optVoteTime.addEventListener('change', emitRoomOptions);
+if (optCustomWords) optCustomWords.addEventListener('input', () => { if (state.roomCode && state.players.find((p) => p.id === state.playerId)?.isHost) emitRoomOptions(); });
+
+copyCodeBtn.addEventListener('click', copyRoomCode);
+leaveRoomBtn.addEventListener('click', () => {
+  if (!state.roomCode) return;
+  socket.emit('leaveRoom', { roomCode: state.roomCode });
+});
+
+howToPlayBtn.addEventListener('click', () => {
+  howToPlayModal.classList.remove('hidden');
+  howToPlayModal.setAttribute('aria-hidden', 'false');
+});
+howToPlayClose.addEventListener('click', () => {
+  howToPlayModal.classList.add('hidden');
+  howToPlayModal.setAttribute('aria-hidden', 'true');
+});
+howToPlayModal.querySelector('.modal-backdrop').addEventListener('click', () => {
+  howToPlayModal.classList.add('hidden');
+  howToPlayModal.setAttribute('aria-hidden', 'true');
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    clueInput.value = '';
+    if (!howToPlayModal.classList.contains('hidden')) {
+      howToPlayModal.classList.add('hidden');
+      howToPlayModal.setAttribute('aria-hidden', 'true');
+    }
+  }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    if (document.activeElement === clueInput && state.phase === 'clue' && isMeAlive()) {
+      e.preventDefault();
+      if (clueInput.value.trim()) {
+        submitClueBtn.disabled = true;
+        socket.emit('submitClue', { roomCode: state.roomCode, clueText: clueInput.value.trim() });
+        logStatus('Clue submitted. Waiting for others...');
+      }
+    }
+    if (document.activeElement && document.activeElement.closest('#vote-options') && state.phase === 'voting' && isMeAlive()) {
+      const checked = document.querySelector("input[name='vote-target']:checked");
+      if (checked && !submitVoteBtn.disabled) {
+        submitVoteBtn.disabled = true;
+        socket.emit('submitVote', { roomCode: state.roomCode, targetId: checked.value });
+        logStatus(checked.value === 'skip' ? 'You chose to skip.' : 'Vote submitted. Waiting for others...');
+      }
+    }
+  }
+});
+
+if (soundMuteCheckbox) {
+  const saved = localStorage.getItem('impostor-sound-mute');
+  if (saved !== null) soundMuteCheckbox.checked = saved === '1';
+  soundMuteCheckbox.addEventListener('change', () => {
+    localStorage.setItem('impostor-sound-mute', soundMuteCheckbox.checked ? '1' : '0');
+  });
+}
+
+if (impostorGuessBtn) {
+  impostorGuessBtn.addEventListener('click', () => {
+    impostorGuessForm.classList.remove('hidden');
+    impostorGuessInput.value = '';
+    impostorGuessInput.focus();
+  });
+}
+if (impostorGuessSubmit && impostorGuessInput) {
+  impostorGuessSubmit.addEventListener('click', () => {
+    if (!state.roomCode || state.role !== 'impostor') return;
+    const word = impostorGuessInput.value.trim();
+    if (!word) return;
+    socket.emit('impostorGuessWord', { roomCode: state.roomCode, word });
+  });
+  impostorGuessInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      impostorGuessSubmit.click();
+    }
+  });
+}
 
 submitClueBtn.addEventListener('click', () => {
   if (!state.roomCode || !clueInput.value.trim() || !isMeAlive()) return;
@@ -535,6 +752,7 @@ submitVoteBtn.addEventListener('click', () => {
   submitVoteBtn.disabled = true;
   const targetId = checked.value;
   socket.emit('submitVote', { roomCode: state.roomCode, targetId });
+  playSound('ok');
   logStatus(targetId === 'skip' ? 'You chose to skip.' : 'Vote submitted. Waiting for others...');
 });
 
@@ -559,10 +777,12 @@ socket.on('phaseTimer', (payload) => {
 socket.on('secretInfo', (payload) => {
   updateSecretInfo(payload);
   enterCluePhase();
+  playSound('ok');
 });
 
 socket.on('startVoting', (payload) => {
   enterVotingPhase(payload);
+  playSound('ok');
 });
 
 socket.on('cluesUpdate', (payload) => {
@@ -577,7 +797,8 @@ socket.on('votesUpdate', (payload) => {
 socket.on('awaitAck', (payload) => {
   renderClues(payload.clues || []);
   enterAckPhase();
-  logStatus('Everyone has submitted a clue. Review them, then click "I have acknowledged the clues".');
+  playSound('ok');
+  logStatus('Everyone has submitted a clue. Review them, then click Continue.');
 });
 
 socket.on('votingResult', (payload) => {
@@ -587,6 +808,7 @@ socket.on('votingResult', (payload) => {
 socket.on('gameOver', (payload) => {
   clearTimerDisplay();
   handleGameOver(payload);
+  playSound('alert');
 });
 
 socket.on('errorMessage', (msg) => {
@@ -608,4 +830,27 @@ socket.on('connect_error', () => {
   socketConnected = false;
   setLobbyError('Could not reach game server. Make sure "npm start" is running and visit http://localhost:3000, not the file directly.');
 });
+
+socket.on('youLeft', () => {
+  state.roomCode = null;
+  state.playerId = null;
+  state.phase = 'lobby';
+  state.players = [];
+  showLobby();
+  logStatus('You left the room.');
+});
+
+socket.on('youWereKicked', () => {
+  state.roomCode = null;
+  state.playerId = null;
+  state.phase = 'lobby';
+  state.players = [];
+  showLobby();
+  logStatus('You were removed from the room.');
+});
+
+socket.on('rateLimit', (msg) => {
+  logStatus(msg || 'Too many actions. Please wait.');
+});
+
 
