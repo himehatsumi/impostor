@@ -18,6 +18,9 @@ let state = {
   secretWord: null,
   secretTheme: null,
   impostorClue: null,
+  options: { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0 },
+  timerEndAt: null,
+  timerInterval: null,
 };
 
 // Elements
@@ -52,6 +55,12 @@ const playersList = document.getElementById('players-list');
 const cluesList = document.getElementById('clues-list');
 const startGameBtn = document.getElementById('start-game-btn');
 const startBotsGameBtn = document.getElementById('start-bots-game-btn');
+const optionsPanel = document.getElementById('options-panel');
+const optMaxRounds = document.getElementById('opt-max-rounds');
+const optClueTime = document.getElementById('opt-clue-time');
+const optVoteTime = document.getElementById('opt-vote-time');
+const phaseTimerEl = document.getElementById('phase-timer');
+const waitingPhaseEl = document.getElementById('waiting-phase');
 
 // Helper UI functions
 function isMeAlive() {
@@ -80,6 +89,38 @@ function setLobbyError(message) {
   lobbyError.textContent = message || '';
 }
 
+function clearTimerDisplay() {
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+  state.timerEndAt = null;
+  phaseTimerEl.classList.add('hidden');
+  phaseTimerEl.classList.remove('warning');
+}
+
+function startTimerDisplay(endAt, durationSeconds) {
+  clearTimerDisplay();
+  if (!durationSeconds || durationSeconds <= 0) return;
+
+  state.timerEndAt = endAt;
+
+  function tick() {
+    const now = Date.now();
+    const left = Math.max(0, Math.ceil((state.timerEndAt - now) / 1000));
+    if (left <= 0) {
+      clearTimerDisplay();
+      return;
+    }
+    phaseTimerEl.classList.remove('hidden');
+    phaseTimerEl.classList.toggle('warning', left <= 10);
+    phaseTimerEl.textContent = `${left}s`;
+  }
+
+  tick();
+  state.timerInterval = setInterval(tick, 500);
+}
+
 function updateRoomState(payload) {
   state = {
     ...state,
@@ -88,6 +129,7 @@ function updateRoomState(payload) {
     roundNumber: payload.roundNumber,
     clueRound: payload.clueRound,
     players: payload.players || [],
+    options: payload.options || state.options,
   };
 
   roomCodeDisplay.textContent = payload.code || '----';
@@ -105,15 +147,35 @@ function updateRoomState(payload) {
   };
   phaseLabel.textContent = phaseNameMap[payload.phase] || 'Lobby';
 
-  // Host can start game from lobby
   const me = state.players.find((p) => p.id === state.playerId);
   const isHost = me && me.isHost;
-  // Host can start game from lobby, and restart after game over.
+
   startGameBtn.classList.toggle(
     'hidden',
     !(isHost && (payload.phase === 'lobby' || payload.phase === 'gameover')),
   );
+  startGameBtn.textContent = payload.phase === 'gameover' ? 'New Game' : 'Start Game';
   startBotsGameBtn.classList.toggle('hidden', !(isHost && payload.phase === 'lobby'));
+
+  // Options panel: only for host in lobby
+  optionsPanel.classList.toggle('hidden', !(isHost && payload.phase === 'lobby'));
+  if (payload.options && isHost && payload.phase === 'lobby') {
+    optMaxRounds.value = String(payload.options.maxRounds ?? 3);
+    optClueTime.value = String(payload.options.clueTimeLimit ?? 0);
+    optVoteTime.value = String(payload.options.voteTimeLimit ?? 0);
+  }
+
+  // Show clue/ack/voting only when game has started; otherwise show waiting.
+  if (payload.phase === 'lobby' || payload.phase === 'gameover') {
+    waitingPhaseEl.classList.remove('hidden');
+    cluePhaseEl.classList.add('hidden');
+    ackPhaseEl.classList.add('hidden');
+    votingPhaseEl.classList.add('hidden');
+    clueInput.disabled = true;
+    submitClueBtn.disabled = true;
+  } else {
+    waitingPhaseEl.classList.add('hidden');
+  }
 
   renderPlayers();
 }
@@ -244,6 +306,7 @@ function renderClues(clues) {
 function enterCluePhase() {
   state.clues = [];
   actionTitle.textContent = 'Clue Phase';
+  waitingPhaseEl.classList.add('hidden');
   cluePhaseEl.classList.remove('hidden');
   ackPhaseEl.classList.add('hidden');
   votingPhaseEl.classList.add('hidden');
@@ -257,7 +320,7 @@ function enterCluePhase() {
     actionTitle.textContent = 'Clue Phase (Spectating)';
     clueInput.disabled = true;
     submitClueBtn.disabled = true;
-    logStatus('You are out this game. You can still read clues and watch voting.');
+    logStatus('You are out. You can still watch.');
   } else {
     clueInput.disabled = false;
   }
@@ -428,10 +491,25 @@ startGameBtn.addEventListener('click', () => {
 
 startBotsGameBtn.addEventListener('click', () => {
   if (!state.roomCode) return;
-  // Ask server to pad room with bots up to at least 3 players (configurable).
   socket.emit('startGameWithBots', { roomCode: state.roomCode, minPlayers: 4 });
   logStatus('Starting local test game with bots...');
 });
+
+function emitRoomOptions() {
+  if (!state.roomCode) return;
+  socket.emit('setRoomOptions', {
+    roomCode: state.roomCode,
+    options: {
+      maxRounds: parseInt(optMaxRounds.value, 10) || 3,
+      clueTimeLimit: parseInt(optClueTime.value, 10) || 0,
+      voteTimeLimit: parseInt(optVoteTime.value, 10) || 0,
+    },
+  });
+}
+
+optMaxRounds.addEventListener('change', emitRoomOptions);
+optClueTime.addEventListener('change', emitRoomOptions);
+optVoteTime.addEventListener('change', emitRoomOptions);
 
 submitClueBtn.addEventListener('click', () => {
   if (!state.roomCode || !clueInput.value.trim() || !isMeAlive()) return;
@@ -462,7 +540,20 @@ submitVoteBtn.addEventListener('click', () => {
 
 // Socket events
 socket.on('roomState', (payload) => {
+  if (payload.phase !== 'clue' && payload.phase !== 'voting') {
+    clearTimerDisplay();
+  }
   updateRoomState(payload);
+});
+
+socket.on('roundStart', (payload) => {
+  state.roundNumber = payload.roundNumber;
+  state.maxRounds = payload.maxRounds;
+  logStatus(`Round ${payload.roundNumber} of ${payload.maxRounds} starting.`);
+});
+
+socket.on('phaseTimer', (payload) => {
+  startTimerDisplay(payload.endAt, payload.durationSeconds);
 });
 
 socket.on('secretInfo', (payload) => {
@@ -494,6 +585,7 @@ socket.on('votingResult', (payload) => {
 });
 
 socket.on('gameOver', (payload) => {
+  clearTimerDisplay();
   handleGameOver(payload);
 });
 

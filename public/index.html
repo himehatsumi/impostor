@@ -12,21 +12,20 @@
     <div id="app">
       <header class="app-header">
         <h1>Impostor</h1>
-        <p class="subtitle">Give clues. Spot the impostor. Don't get caught.</p>
       </header>
 
       <main class="app-main">
         <!-- Start / Join -->
         <section id="lobby-screen" class="card">
-          <h2>Start or Join a Game</h2>
+          <h2>Start or Join</h2>
           <div class="form-row">
-            <label for="nickname">Nickname</label>
-            <input id="nickname" type="text" placeholder="Your name" />
+            <label for="nickname">Name</label>
+            <input id="nickname" type="text" placeholder="Your name" maxlength="20" />
           </div>
           <div class="button-row">
-            <button id="create-btn" class="primary">Create Game</button>
+            <button id="create-btn" class="primary">Create</button>
             <span class="or-label">or</span>
-            <input id="join-code" type="text" placeholder="ROOM" maxlength="4" class="room-input" />
+            <input id="join-code" type="text" placeholder="Code" maxlength="4" class="room-input" />
             <button id="join-btn" class="secondary">Join</button>
           </div>
           <p id="lobby-error" class="error-text"></p>
@@ -35,13 +34,11 @@
         <!-- Game -->
         <section id="game-screen" class="card hidden">
           <div class="room-header">
-            <div>
-              <span class="badge">Room</span>
-              <span id="room-code-display" class="room-code"></span>
-            </div>
+            <span id="room-code-display" class="room-code"></span>
             <div class="round-info">
               <span id="round-label"></span>
               <span id="phase-label" class="phase-label"></span>
+              <span id="phase-timer" class="phase-timer hidden"></span>
             </div>
           </div>
 
@@ -55,25 +52,22 @@
                 <p id="secret-theme" class="secret-theme"></p>
               </section>
 
-              <section class="panel">
+              <section class="panel action-panel">
                 <h3 id="action-title">Clue Phase</h3>
-                <div id="clue-phase">
-                  <p class="hint">
-                    Give a short clue about the word. <strong>Do not say the word itself.</strong>
-                  </p>
-                  <textarea id="clue-input" rows="2" placeholder="Your clue here..."></textarea>
+                <div id="waiting-phase" class="waiting-phase">
+                  <p class="waiting-text">Waiting for the host to start the game.</p>
+                </div>
+                <div id="clue-phase" class="hidden">
+                  <p class="hint">Give a short clue about the word. Do not say the word itself.</p>
+                  <textarea id="clue-input" rows="2" placeholder="Your clue..."></textarea>
                   <button id="submit-clue-btn" class="primary">Submit Clue</button>
                 </div>
                 <div id="ack-phase" class="hidden">
-                  <p class="hint">
-                    Review everyone's clues. When you're ready, click the button below to continue to the next clue round.
-                  </p>
-                  <button id="ack-btn" class="secondary">I have acknowledged the clues</button>
+                  <p class="hint">Review clues, then continue.</p>
+                  <button id="ack-btn" class="secondary">Continue</button>
                 </div>
                 <div id="voting-phase" class="hidden">
-                  <p class="hint">
-                    Read the clues and vote for who you think is the impostor, or choose <strong>Skip</strong>.
-                  </p>
+                  <p class="hint">Vote for the impostor or skip.</p>
                   <div id="vote-options"></div>
                   <button id="submit-vote-btn" class="primary">Submit Vote</button>
                 </div>
@@ -95,6 +89,39 @@
                     <button id="start-game-btn" class="primary small hidden">Start Game</button>
                   </div>
                 </div>
+                <div id="options-panel" class="options-panel hidden">
+                  <h4>Game options</h4>
+                  <div class="option-row">
+                    <label for="opt-max-rounds">Max rounds</label>
+                    <select id="opt-max-rounds">
+                      <option value="1">1</option>
+                      <option value="3" selected>3</option>
+                      <option value="5">5</option>
+                      <option value="7">7</option>
+                      <option value="10">10</option>
+                    </select>
+                  </div>
+                  <div class="option-row">
+                    <label for="opt-clue-time">Clue timer (sec)</label>
+                    <select id="opt-clue-time">
+                      <option value="0" selected>Off</option>
+                      <option value="30">30</option>
+                      <option value="60">60</option>
+                      <option value="90">90</option>
+                      <option value="120">120</option>
+                    </select>
+                  </div>
+                  <div class="option-row">
+                    <label for="opt-vote-time">Vote timer (sec)</label>
+                    <select id="opt-vote-time">
+                      <option value="0" selected>Off</option>
+                      <option value="30">30</option>
+                      <option value="45">45</option>
+                      <option value="60">60</option>
+                      <option value="90">90</option>
+                    </select>
+                  </div>
+                </div>
                 <ul id="players-list" class="players-list"></ul>
               </section>
 
@@ -110,11 +137,7 @@
       </main>
 
       <footer class="app-footer">
-        <p>
-          Customize words &amp; themes in
-          <code>words.js</code>. Tweak UI in <code>public/index.html</code> and
-          <code>public/styles.css</code>.
-        </p>
+        <p>Impostor — word game</p>
       </footer>
     </div>
 

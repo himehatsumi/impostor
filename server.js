@@ -62,9 +62,16 @@ function createRoom(hostSocket, nickname) {
     currentWordEntry: null,
     impostorId: null,
     impostorClue: null,
-    clues: {}, // { playerId: [clueRound1, clueRound2] }
-    votes: {}, // { voterId: targetId | 'skip' }
+    clues: {},
+    votes: {},
+    acks: {},
     createdAt: Date.now(),
+    options: {
+      maxRounds: 3,
+      clueTimeLimit: 0, // seconds, 0 = no limit
+      voteTimeLimit: 0,
+    },
+    phaseTimerRef: null,
   };
 
   rooms.set(code, room);
@@ -75,6 +82,80 @@ function createRoom(hostSocket, nickname) {
 
 function broadcastRoomState(room) {
   io.to(room.code).emit('roomState', serializeRoomForClients(room));
+}
+
+function clearPhaseTimer(room) {
+  if (room.phaseTimerRef) {
+    clearTimeout(room.phaseTimerRef);
+    room.phaseTimerRef = null;
+  }
+}
+
+function startCluePhaseTimer(room) {
+  clearPhaseTimer(room);
+  const limit = (room.options && room.options.clueTimeLimit) || 0;
+  if (limit <= 0) return;
+
+  const endAt = Date.now() + limit * 1000;
+  io.to(room.code).emit('phaseTimer', { phase: 'clue', endAt, durationSeconds: limit });
+
+  room.phaseTimerRef = setTimeout(() => {
+    room.phaseTimerRef = null;
+    if (room.phase !== 'clue') return;
+
+    const alivePlayers = room.players.filter((p) => p.alive);
+    alivePlayers.forEach((p) => {
+      if (!room.clues[p.id]) room.clues[p.id] = [];
+      while (room.clues[p.id].length < room.clueRound) {
+        room.clues[p.id].push('');
+      }
+    });
+
+    io.to(room.code).emit('cluesUpdate', {
+      clues: buildCluesForClients(room),
+      roundNumber: room.roundNumber,
+      clueRound: room.clueRound,
+    });
+    advanceClueRoundOrVoting(room);
+  }, limit * 1000);
+}
+
+function startVotePhaseTimer(room) {
+  clearPhaseTimer(room);
+  const limit = (room.options && room.options.voteTimeLimit) || 0;
+  if (limit <= 0) return;
+
+  const endAt = Date.now() + limit * 1000;
+  io.to(room.code).emit('phaseTimer', { phase: 'voting', endAt, durationSeconds: limit });
+
+  room.phaseTimerRef = setTimeout(() => {
+    room.phaseTimerRef = null;
+    if (room.phase !== 'voting') return;
+
+    const alivePlayers = room.players.filter((p) => p.alive);
+    alivePlayers.forEach((p) => {
+      if (room.votes[p.id] === undefined) room.votes[p.id] = 'skip';
+    });
+
+    const eliminated = tallyVotes(room);
+    if (!eliminated) {
+      if (room.roundNumber >= room.maxRounds) {
+        endGame(room, true);
+      } else {
+        startNewRound(room);
+      }
+      return;
+    }
+    if (eliminated.id === room.impostorId) {
+      endGame(room, false);
+      return;
+    }
+    if (room.roundNumber >= room.maxRounds) {
+      endGame(room, true);
+    } else {
+      startNewRound(room);
+    }
+  }, limit * 1000);
 }
 
 function serializeRoomForClients(room) {
@@ -92,6 +173,7 @@ function serializeRoomForClients(room) {
       score: p.score,
       isBot: !!p.isBot,
     })),
+    options: room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0 },
   };
 }
 
@@ -289,33 +371,41 @@ function scheduleBotVotes(room) {
 }
 
 function startNewRound(room) {
+  clearPhaseTimer(room);
+
   room.roundNumber += 1;
   room.clueRound = 1;
   room.phase = 'clue';
   room.clues = {};
   room.votes = {};
+  room.acks = {};
 
   const entry = getRandomWord();
   room.currentWordEntry = entry;
 
   const alivePlayers = room.players.filter((p) => p.alive);
-  // Assign impostor only once per game and keep them between rounds.
   if (!room.impostorId) {
     const impostor = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
     room.impostorId = impostor.id;
   }
   room.impostorClue = generateImpostorClue(entry);
 
-  // Reset impostor flags based on the persisted impostorId.
   room.players.forEach((p) => {
     p.isImpostor = p.id === room.impostorId;
   });
 
-  sendSecretInfoForCurrentRound(room);
-
+  // Round is ready (word + impostor + clues prepared); then send secret info.
+  room.maxRounds = (room.options && room.options.maxRounds) || 3;
+  io.to(room.code).emit('roundStart', {
+    roundNumber: room.roundNumber,
+    maxRounds: room.maxRounds,
+  });
   broadcastRoomState(room);
 
-  // For local testing, schedule automatic bot clues.
+  sendSecretInfoForCurrentRound(room);
+  broadcastRoomState(room);
+
+  startCluePhaseTimer(room);
   scheduleBotClues(room);
 }
 
@@ -325,14 +415,13 @@ function maybeAdvanceFromAck(room) {
   const allAcked = alivePlayers.every((p) => room.acks && room.acks[p.id]);
   if (!allAcked) return;
 
-  // Move into second clue round using the same word/clue.
   room.clueRound = 2;
   room.phase = 'clue';
 
   sendSecretInfoForCurrentRound(room);
   broadcastRoomState(room);
 
-  // Schedule bot clues for round 2.
+  startCluePhaseTimer(room);
   scheduleBotClues(room);
 }
 
@@ -342,6 +431,8 @@ function advanceClueRoundOrVoting(room) {
     (p) => room.clues[p.id] && room.clues[p.id].length >= room.clueRound,
   );
   if (!allSubmitted) return;
+
+  clearPhaseTimer(room);
 
   if (room.clueRound < 2) {
     // After the first round of clues, pause for acknowledgement
@@ -370,7 +461,6 @@ function advanceClueRoundOrVoting(room) {
     room.phase = 'voting';
     room.votes = {};
 
-    // Reveal all clues to everyone (without marking impostor).
     const cluesForClients = buildCluesForClients(room);
 
     io.to(room.code).emit('startVoting', {
@@ -380,7 +470,7 @@ function advanceClueRoundOrVoting(room) {
 
     broadcastRoomState(room);
 
-    // Schedule bot votes once voting begins.
+    startVotePhaseTimer(room);
     scheduleBotVotes(room);
   }
 }
@@ -435,6 +525,7 @@ function tallyVotes(room) {
 }
 
 function endGame(room, impostorWins) {
+  clearPhaseTimer(room);
   room.phase = 'gameover';
 
   // Simple score rule: each surviving winner gets +1.
@@ -459,7 +550,8 @@ function endGame(room, impostorWins) {
 
 io.on('connection', (socket) => {
   socket.on('createRoom', ({ nickname }, callback) => {
-    const room = createRoom(socket, nickname);
+    const name = (nickname || '').trim() || 'Host';
+    const room = createRoom(socket, name);
     if (typeof callback === 'function') {
       callback({ ok: true, roomCode: room.code, playerId: socket.id });
     }
@@ -490,9 +582,19 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const name = (nickname || '').trim() || `Player ${room.players.length + 1}`;
+    const nameLower = name.toLowerCase();
+    const nameTaken = room.players.some((p) => p.name.toLowerCase() === nameLower);
+    if (nameTaken) {
+      if (typeof callback === 'function') {
+        callback({ ok: false, error: 'That name is already taken in this room.' });
+      }
+      return;
+    }
+
     const newPlayer = {
       id: socket.id,
-      name: nickname || `Player ${room.players.length + 1}`,
+      name,
       isHost: false,
       isImpostor: false,
       isBot: false,
@@ -515,13 +617,11 @@ io.on('connection', (socket) => {
     const player = room.players.find((p) => p.id === socket.id);
     if (!player || !player.isHost) return;
 
-    // If there are fewer than 3 human players, automatically pad with bots
-    // so local testing "just works" without needing multiple browser tabs.
     if (room.players.length < 3) {
       ensureMinimumPlayersWithBots(room, 3);
     }
 
-    // Reset per-game state so this is treated as a fresh game.
+    // Full reset: scores, deaths, and all round state for a new game.
     room.phase = 'clue';
     room.roundNumber = 0;
     room.clueRound = 0;
@@ -531,26 +631,25 @@ io.on('connection', (socket) => {
     room.currentWordEntry = null;
     room.impostorId = null;
     room.impostorClue = null;
+    clearPhaseTimer(room);
     room.players.forEach((p) => {
       p.alive = true;
       p.isImpostor = false;
+      p.score = 0;
     });
+    room.maxRounds = (room.options && room.options.maxRounds) || 3;
 
     startNewRound(room);
   });
 
-  // Convenience: host can start a local test game with bots so they
-  // don't need multiple browser windows to reach 3+ players.
   socket.on('startGameWithBots', ({ roomCode, minPlayers = 3 }) => {
     const room = getRoom(roomCode);
     if (!room) return;
     const player = room.players.find((p) => p.id === socket.id);
     if (!player || !player.isHost) return;
 
-    // Add bots until we have at least minPlayers total.
     ensureMinimumPlayersWithBots(room, Math.max(3, Math.min(minPlayers, 10)));
 
-    // Reset per-game state so this is treated as a fresh game.
     room.phase = 'clue';
     room.roundNumber = 0;
     room.clueRound = 0;
@@ -560,12 +659,34 @@ io.on('connection', (socket) => {
     room.currentWordEntry = null;
     room.impostorId = null;
     room.impostorClue = null;
+    clearPhaseTimer(room);
     room.players.forEach((p) => {
       p.alive = true;
       p.isImpostor = false;
+      p.score = 0;
     });
+    room.maxRounds = (room.options && room.options.maxRounds) || 3;
 
     startNewRound(room);
+    broadcastRoomState(room);
+  });
+
+  socket.on('setRoomOptions', ({ roomCode, options }) => {
+    const room = getRoom(roomCode);
+    if (!room) return;
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player || !player.isHost || room.phase !== 'lobby') return;
+
+    room.options = room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0 };
+    if (typeof options.maxRounds === 'number' && options.maxRounds >= 1 && options.maxRounds <= 10) {
+      room.options.maxRounds = options.maxRounds;
+    }
+    if (typeof options.clueTimeLimit === 'number' && options.clueTimeLimit >= 0 && options.clueTimeLimit <= 300) {
+      room.options.clueTimeLimit = options.clueTimeLimit;
+    }
+    if (typeof options.voteTimeLimit === 'number' && options.voteTimeLimit >= 0 && options.voteTimeLimit <= 120) {
+      room.options.voteTimeLimit = options.voteTimeLimit;
+    }
     broadcastRoomState(room);
   });
 

@@ -1,0 +1,5 @@
+bugs:
+reset entire game state when pressing new game, reset deaths
+make clues before round start
+
+add options like max rounds and stuff, add a timer
