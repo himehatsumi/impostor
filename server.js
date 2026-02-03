@@ -429,20 +429,30 @@ function startNewRound(room) {
   room.votes = {};
   room.acks = {};
 
-  const customWords = room.options && Array.isArray(room.options.customWords) && room.options.customWords.length >= 1
-    ? room.options.customWords
-    : null;
-  const entry = customWords
+if (!room.currentWordEntry) {
+  const customWords =
+    room.options &&
+    Array.isArray(room.options.customWords) &&
+    room.options.customWords.length >= 1
+      ? room.options.customWords
+      : null;
+
+  room.currentWordEntry = customWords
     ? getRandomWordFromList(customWords) || getRandomWord()
     : getRandomWord();
-  room.currentWordEntry = entry;
+}
+
+// Always generate a new impostor clue from the SAME word
+room.impostorClue = generateImpostorClue(room.currentWordEntry);
+
+  
 
   const alivePlayers = getAliveConnectedPlayers(room);
   if (!room.impostorId) {
     const impostor = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
     room.impostorId = impostor.id;
   }
-  room.impostorClue = generateImpostorClue(entry);
+  room.impostorClue = generateImpostorClue(room.currentWordEntry);
 
   room.players.forEach((p) => {
     p.isImpostor = p.id === room.impostorId;
