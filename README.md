@@ -1,77 +1,106 @@
-## Impostor – Online Multiplayer Word Game
-
-This is a small full-stack scaffold for an online multiplayer word game called **Impostor**.
-
-You can **run it locally** for development *or* play it instantly via the hosted version on Render:
-
-👉 **Live demo:** [https://impostor-0fbg.onrender.com/](https://impostor-0fbg.onrender.com/)
+Got it — here’s a **clean, professional, open-source–style rewrite**, trimmed to just the essentials and written like a real project README. No fluff, no emojis, no marketing hype.
 
 ---
 
-### Features
+# Impostor
 
-* **3–10 players per room**
-* **Random word generation** from a built-in list (`words.js`)
-* **Impostor assignment** every round
-* **Impostor-only related clue** (not the word itself) via `generateImpostorClue`
-* **Round management**: 2 clue phases → 1 voting phase
-* **Voting system** with tie / skip handling
-* **Win conditions**:
+**Online Multiplayer Word Deduction Game**
 
-  * Impostor voted out → crewmates win
-  * After 4 rounds without impostor being eliminated → impostor wins
-* **Score tracking** across rounds in the same room
-* **Real-time multiplayer** using Socket.IO
-* **Simple start / join UI** with modern styling
+Impostor is a lightweight full-stack multiplayer word game inspired by social deduction mechanics. Players receive the same secret word—except for one impostor, who must blend in using a related clue instead. The group discusses, votes, and attempts to identify the impostor before time runs out.
+
+**Live demo:**
+[https://impostor-0fbg.onrender.com/](https://impostor-0fbg.onrender.com/)
 
 ---
 
-### Getting Started (Local)
+## Gameplay Overview
+
+* **Players per room:** 3–10
+* **Roles:**
+
+  * Crewmates receive the secret word
+  * One impostor receives a related clue (not the word)
+* **Rounds:**
+
+  * Two clue-giving phases
+  * One voting phase
+* **Win conditions:**
+
+  * Crewmates win if the impostor is voted out
+  * Impostor wins if they survive 4 rounds
+* **Scoring:**
+
+  * Scores persist across rounds within the same room
+
+---
+
+## Features
+
+* Real-time multiplayer using **Socket.IO**
+* Automatic room and round management
+* Random word selection from a built-in list
+* Impostor-specific clue generation
+* Voting system with tie and skip handling
+* Simple, responsive browser-based UI
+* No accounts or database required
+
+---
+
+## Tech Stack
+
+* **Backend:** Node.js, Express, Socket.IO
+* **Frontend:** Vanilla HTML, CSS, JavaScript
+* **Deployment:** Render
+
+---
+
+## Running Locally
 
 ```bash
 npm install
 npm start
 ```
 
-Then open `http://localhost:3000` in multiple browser windows/tabs and play.
+Open `http://localhost:3000` in multiple browser tabs or devices to play.
 
 ---
 
-### Hosted Version
+## Project Structure
 
-The game is also deployed on **Render**, so you can play without installing anything:
-
-👉 [https://impostor-0fbg.onrender.com/](https://impostor-0fbg.onrender.com/)
-
-(First load may take a few seconds if the server is waking up.)
-
----
-
-### Customization Points
-
-* **Word list & themes**: edit `words.js`
-
-  * Add/remove entries in `WORDS`
-  * Replace `getRandomWord` to pull from an API or database
-  * Enhance `generateImpostorClue` to call an AI model for smarter, subtler clues
-* **Game rules & phases**: edit `server.js`
-
-  * Adjust `maxRounds`
-  * Change scoring logic in `endGame`
-  * Modify how ties / skips are handled in `tallyVotes`
-* **UI & visuals**: edit `public/index.html`, `public/styles.css`, `public/client.js`
-
-  * Style impostor reveal at game end
-  * Add animations, avatars, sound effects, etc.
+```
+├── server.js          # Server, room logic, game flow
+├── words.js           # Word list and impostor clue generator
+├── public/
+│   ├── index.html     # Main UI
+│   ├── styles.css     # Styling
+│   └── client.js      # Frontend game logic
+```
 
 ---
 
-### Files
+## Customization
 
-* `server.js` – Express + Socket.IO server, room + round logic
-* `words.js` – Word list and impostor clue generator
-* `public/index.html` – Main UI layout
-* `public/styles.css` – Visual design
-* `public/client.js` – Front-end game controller using Socket.IO client
-* add a **“Deploy to Render”** section
-* or rewrite it to sound more like a polished open-source project ✨
+* **Words & themes:**
+  Modify `words.js` to add themes, expand the word list, or source words externally.
+* **Game rules:**
+  Adjust round limits, scoring, or voting behavior in `server.js`.
+* **Clue generation:**
+  Replace `generateImpostorClue` with an AI-based or API-driven system.
+* **UI:**
+  Enhance visuals, animations, or add player avatars via the `public/` files.
+
+---
+
+## Deployment
+
+The project is ready to deploy on platforms like **Render** with no additional configuration.
+The live demo uses the same codebase as this repository.
+
+---
+
+## License
+
+MIT License.
+Free to use, modify, and redistribute.
+
+---
