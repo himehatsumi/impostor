@@ -96,7 +96,7 @@ The live demo uses the same codebase as this repository.
 
 ## License
 
-MIT License.
+The UnLicense.
 Free to use, modify, and redistribute.
 
 ---
