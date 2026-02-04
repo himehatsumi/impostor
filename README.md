@@ -66,23 +66,41 @@ Open `http://localhost:3000` in multiple browser tabs or devices to play.
 
 ```
 ├── server.js          # Server, room logic, game flow
-├── words.js           # Word list and impostor clue generator
+├── words/             # Word lists organized by category
+│   ├── index.js       # Main words module
+│   ├── food.js        # 114 food words (theme: edible)
+│   ├── animals.js     # 126 animal words (theme: creature)
+│   ├── nature.js      # 67 nature words (theme: natural)
+│   ├── videogames.js  # 156 game words (theme: game)
+│   ├── music.js       # 123 music words (theme: artist)
+│   ├── memes.js       # 161 meme words (theme: internet)
+│   ├── movies.js      # 100 movie words (theme: media)
+│   ├── technology.js  # 42 tech words (theme: tech)
+│   ├── objects.js     # 57 object words (theme: thing)
+│   ├── sports.js      # 57 sport words (theme: activity)
+│   ├── places.js      # 50 place words (theme: location)
+│   ├── anime.js       # 134 anime words (theme: show)
+│   └── abstract.js    # 54 abstract words (theme: concept)
 ├── public/
 │   ├── index.html     # Main UI
 │   ├── styles.css     # Styling
 │   └── client.js      # Frontend game logic
 ```
 
+**Total: 1241 words across 13 categories**
+
+All themes are intentionally generic (e.g., "edible", "creature", "artist") to make the impostor role more challenging.
+
 ---
 
 ## Customization
 
 * **Words & themes:**
-  Modify `words.js` to add themes, expand the word list, or source words externally.
+  Words are organized in separate category files in the `words/` folder. Each category has a generic theme (e.g., food → "edible", music → "artist"). To add words, edit the appropriate category file (e.g., `words/food.js`) and restart the server. See `words/README.md` for details.
 * **Game rules:**
   Adjust round limits, scoring, or voting behavior in `server.js`.
 * **Clue generation:**
-  Replace `generateImpostorClue` with an AI-based or API-driven system.
+  Replace `generateImpostorClue` in `words/index.js` with an AI-based or API-driven system.
 * **UI:**
   Enhance visuals, animations, or add player avatars via the `public/` files.
 
