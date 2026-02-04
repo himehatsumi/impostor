@@ -431,12 +431,36 @@ function updateSecretInfo(secret) {
 }
 
 function renderClues(clues) {
-  state.clues = clues || [];
+  clues = clues || [];
   cluesList.classList.remove('empty-state');
+  
+  // Track existing clue player IDs before update
+  const existingClueIds = new Set();
+  cluesList.querySelectorAll('.clue-row').forEach(row => {
+    const playerId = row.dataset.playerId;
+    if (playerId) existingClueIds.add(playerId);
+  });
+  
+  // Clear and rebuild
   cluesList.innerHTML = '';
-  state.clues.forEach((c) => {
+  
+  clues.forEach((c, index) => {
     const row = document.createElement('div');
     row.className = 'clue-row';
+    row.dataset.playerId = c.playerId;
+    
+    // Only add 'new' class if this clue wasn't in the list before
+    const isNew = !existingClueIds.has(c.playerId);
+    if (isNew) {
+      row.classList.add('new');
+      // Stagger the animation based on order
+      row.style.animationDelay = `${index * 0.1}s`;
+      // Remove the 'new' class after animation completes
+      setTimeout(() => {
+        row.classList.remove('new');
+        row.style.animationDelay = '';
+      }, 300 + (index * 100));
+    }
 
     const name = document.createElement('div');
     name.className = 'clue-name';
@@ -452,6 +476,9 @@ function renderClues(clues) {
 
     cluesList.appendChild(row);
   });
+  
+  // Update state after rendering
+  state.clues = clues;
 }
 
 function enterCluePhase() {
@@ -474,6 +501,7 @@ function enterCluePhase() {
     logStatus('You are out. You can still watch.');
   } else {
     clueInput.disabled = false;
+    clueInput.focus();
   }
 }
 
@@ -556,6 +584,17 @@ function handleVotingResult(payload) {
         player && player.id === state.playerId ? ' (that was you!)' : ''
       }.`,
     );
+    
+    // Add elimination animation to player row
+    setTimeout(() => {
+      const playerRows = document.querySelectorAll('.player-row');
+      playerRows.forEach(row => {
+        const nameEl = row.querySelector('.player-name');
+        if (nameEl && player && nameEl.textContent.includes(player.name)) {
+          row.classList.add('eliminated');
+        }
+      });
+    }, 100);
   }
 }
 
@@ -583,6 +622,62 @@ function handleGameOver(payload) {
   actionTitle.textContent = 'Game Over';
   cluePhaseEl.classList.add('hidden');
   votingPhaseEl.classList.add('hidden');
+
+  // Create game over overlay
+  showGameOverOverlay(youWin, word, impostorName, impostorClue, sideText);
+}
+
+function showGameOverOverlay(youWin, word, impostorName, impostorClue, sideText) {
+  // Remove existing overlay if any
+  const existing = document.getElementById('game-over-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'game-over-overlay';
+  overlay.className = 'game-over-overlay';
+
+  const card = document.createElement('div');
+  card.className = `game-over-card ${youWin ? 'win' : 'lose'}`;
+
+  const title = document.createElement('h2');
+  title.className = `game-over-title ${youWin ? 'win' : 'lose'}`;
+  title.textContent = youWin ? '🎉 Victory!' : '💀 Defeat';
+
+  const wordEl = document.createElement('div');
+  wordEl.className = 'game-over-word';
+  wordEl.textContent = `The word was: ${word.toUpperCase()}`;
+
+  const details = document.createElement('div');
+  details.className = 'game-over-details';
+  details.textContent = sideText;
+
+  const impostorInfo = document.createElement('div');
+  impostorInfo.className = 'game-over-impostor';
+  impostorInfo.innerHTML = `<strong>Impostor:</strong> ${impostorName}<br><strong>Clue:</strong> "${impostorClue}"`;
+
+  const actions = document.createElement('div');
+  actions.className = 'game-over-actions';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'secondary';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', () => overlay.remove());
+
+  actions.appendChild(closeBtn);
+
+  card.appendChild(title);
+  card.appendChild(wordEl);
+  card.appendChild(details);
+  card.appendChild(impostorInfo);
+  card.appendChild(actions);
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  // Auto-remove after 15 seconds
+  setTimeout(() => {
+    if (overlay.parentNode) overlay.remove();
+  }, 15000);
 }
 
 // Event listeners

@@ -5,10 +5,58 @@
   --accent: #3b82f6;
   --accent-dim: rgba(59, 130, 246, 0.12);
   --danger: #ef4444;
+  --success: #22c55e;
   --text: #e5e5e5;
   --text-muted: #737373;
   --border: #262626;
   --radius: 8px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes glow {
+  0%, 100% {
+    border-color: var(--border);
+  }
+  50% {
+    border-color: var(--accent);
+  }
 }
 
 *,
@@ -55,6 +103,7 @@ body {
   border-radius: var(--radius);
   padding: 20px;
   border: 1px solid var(--border);
+  animation: fadeIn 0.3s ease-out;
 }
 
 .hidden {
@@ -88,11 +137,13 @@ textarea {
   color: var(--text);
   font-size: 0.95rem;
   outline: none;
+  transition: border-color 0.2s ease;
 }
 
 input:focus,
 textarea:focus {
   border-color: var(--accent);
+  box-shadow: none;
 }
 
 textarea {
@@ -126,7 +177,16 @@ button {
   padding: 8px 14px;
   font-size: 0.9rem;
   font-weight: 500;
-  transition: opacity 0.15s;
+  transition: all 0.2s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 button:disabled {
@@ -278,10 +338,12 @@ button:disabled {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--accent);
+  transition: color 0.3s ease;
 }
 
 .phase-timer.warning {
   color: var(--danger);
+  animation: pulse 1s ease-in-out infinite;
 }
 
 .layout {
@@ -302,6 +364,7 @@ button:disabled {
   border-radius: var(--radius);
   padding: 14px;
   border: 1px solid var(--border);
+  transition: all 0.3s ease;
 }
 
 .panel-header {
@@ -566,6 +629,16 @@ button:disabled {
   border-radius: 6px;
   margin-bottom: 2px;
   background: var(--bg-panel);
+  transition: all 0.3s ease;
+}
+
+.player-row.eliminated {
+  animation: shake 0.5s ease-out;
+  opacity: 0.6;
+}
+
+.player-row:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .player-main {
@@ -615,6 +688,10 @@ button:disabled {
   background: var(--bg-panel);
 }
 
+.clue-row.new {
+  animation: slideIn 0.3s ease-out;
+}
+
 .clue-name {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -628,6 +705,17 @@ button:disabled {
 .empty-state {
   color: var(--text-muted);
   font-size: 0.9rem;
+  text-align: center;
+  padding: 20px;
+  font-style: italic;
+}
+
+.empty-state::before {
+  content: '⏳';
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 8px;
+  opacity: 0.5;
 }
 
 .vote-option {
@@ -654,7 +742,96 @@ button:disabled {
   text-align: center;
 }
 
+/* Game Over Overlay */
+.game-over-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  animation: fadeIn 0.5s ease-out;
+  padding: 20px;
+}
+
+.game-over-card {
+  background: var(--bg-panel);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  animation: fadeIn 0.6s ease-out;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.game-over-card.win {
+  border-color: var(--success);
+}
+
+.game-over-card.lose {
+  border-color: var(--danger);
+}
+
+.game-over-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 16px;
+  animation: pulse 0.8s ease-out;
+}
+
+.game-over-title.win {
+  color: var(--success);
+}
+
+.game-over-title.lose {
+  color: var(--danger);
+}
+
+.game-over-word {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 16px 0;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.game-over-details {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin: 12px 0;
+  line-height: 1.6;
+}
+
+.game-over-impostor {
+  font-size: 1.1rem;
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.game-over-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.game-over-actions button {
+  padding: 12px 24px;
+  font-size: 1rem;
+}
+
+/* Mobile Optimizations */
 @media (max-width: 700px) {
+  #app {
+    padding: 16px 12px;
+  }
+
   .layout {
     grid-template-columns: 1fr;
   }
@@ -662,5 +839,89 @@ button:disabled {
   .room-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
+  }
+
+  .round-info {
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+  }
+
+  button {
+    padding: 10px 16px;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  .small {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    min-height: 36px;
+  }
+
+  input,
+  textarea {
+    padding: 10px 14px;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  .vote-option {
+    padding: 8px;
+    margin-bottom: 8px;
+    background: var(--bg-panel);
+    border-radius: 6px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .vote-option input[type='radio'] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .modal-content {
+    padding: 24px 16px;
+    max-width: 100%;
+  }
+
+  .game-over-card {
+    padding: 24px 16px;
+  }
+
+  .game-over-title {
+    font-size: 2rem;
+  }
+
+  .game-over-word {
+    font-size: 1.5rem;
+  }
+
+  .game-over-actions {
+    flex-direction: column;
+  }
+
+  .game-over-actions button {
+    width: 100%;
+  }
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+  button:hover:not(:disabled) {
+    transform: none;
+  }
+
+  button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .player-row:hover {
+    background: var(--bg-panel);
+  }
+
+  .vote-option:active {
+    background: rgba(255, 255, 255, 0.05);
   }
 }
