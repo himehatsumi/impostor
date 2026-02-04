@@ -890,8 +890,34 @@ io.on('connection', (socket) => {
 
     const guess = String(word || '').trim().toLowerCase();
     const actual = room.currentWordEntry.word.trim().toLowerCase();
+    
+    // Normalize strings: remove spaces, punctuation, and special characters
+    const normalizeString = (str) => {
+      return str
+        .replace(/[^a-z0-9]/gi, '') // Remove all non-alphanumeric characters
+        .toLowerCase();
+    };
+    
+    const normalizedGuess = normalizeString(guess);
+    const normalizedActual = normalizeString(actual);
+    
+    // Check for exact match (case-insensitive)
+    const exactMatch = guess === actual;
+    
+    // Check for normalized match (handles spacing, punctuation, casing)
+    const normalizedMatch = normalizedGuess === normalizedActual;
+    
+    // Check if guess is a significant substring (at least 70% of the word)
+    const substringMatch = normalizedActual.includes(normalizedGuess) && 
+                          normalizedGuess.length >= Math.ceil(normalizedActual.length * 0.7);
+    
+    // Check if actual word is contained in the guess (handles extra words)
+    const containsMatch = normalizedGuess.includes(normalizedActual) &&
+                         normalizedActual.length >= 3; // Avoid matching very short words
+    
     clearPhaseTimer(room);
-    if (guess === actual) {
+    
+    if (exactMatch || normalizedMatch || substringMatch || containsMatch) {
       endGame(room, true);
     } else {
       endGame(room, false);
