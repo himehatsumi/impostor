@@ -76,7 +76,9 @@
                 <div id="clue-phase" class="hidden">
                   <p class="hint">Give a short clue about the word. Do not say the word itself.</p>
                   <textarea id="clue-input" rows="2" placeholder="Your clue..."></textarea>
-                  <button id="submit-clue-btn" class="primary">Submit Clue</button>
+                  <div class="clue-submit-wrapper">
+                    <button id="submit-clue-btn" class="primary clue-submit">Submit Clue</button>
+                  </div>
                 </div>
                 <div id="ack-phase" class="hidden">
                   <p class="hint">Review clues, then continue.</p>
@@ -85,7 +87,9 @@
                 <div id="voting-phase" class="hidden">
                   <p class="hint">Vote for the impostor or skip.</p>
                   <div id="vote-options"></div>
-                  <button id="submit-vote-btn" class="primary">Submit Vote</button>
+                  <div class="vote-submit-wrapper">
+                    <button id="submit-vote-btn" class="primary vote-submit">Submit Vote</button>
+                  </div>
                 </div>
               </section>
 

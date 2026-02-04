@@ -967,7 +967,6 @@ const WORDS = [
   { word: 'speed skating', theme: 'sport', category: 'sports' },
   { word: 'curling', theme: 'sport', category: 'sports' },
   { word: 'bobsled', theme: 'sport', category: 'sports' },
-  { word: 'luge', theme: 'sport', category: 'sports' },
   { word: 'skeleton', theme: 'sport', category: 'sports' },
   { word: 'biathlon', theme: 'sport', category: 'sports' },
   { word: 'triathlon', theme: 'sport', category: 'sports' },
