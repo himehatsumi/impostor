@@ -105,20 +105,40 @@
                     <button id="start-game-btn" class="primary small hidden">Start Game</button>
                   </div>
                 </div>
-                <div id="options-panel" class="options-panel hidden">
-                  <h4>Game options</h4>
-                  <div class="option-row">
-                    <label for="opt-max-rounds">Max rounds</label>
-                    <select id="opt-max-rounds">
-                      <option value="1">1</option>
-                      <option value="3" selected>3</option>
-                      <option value="5">5</option>
-                      <option value="7">7</option>
-                      <option value="10">10</option>
+                <ul id="players-list" class="players-list"></ul>
+              </section>
+
+              <section id="options-panel" class="panel options-section collapsed hidden">
+                <div class="options-header" id="options-header">
+                  <h3>Game Options</h3>
+                  <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="options-content" id="options-content">
+                  <div class="options-grid">
+                  <div class="option-group">
+                    <label for="opt-max-rounds">Max Rounds</label>
+                    <input type="number" id="opt-max-rounds" min="1" max="20" value="3" />
+                  </div>
+                  <div class="option-group">
+                    <label for="opt-category">Word Category</label>
+                    <select id="opt-category">
+                      <option value="all" selected>All Categories</option>
+                      <option value="food">Food & Drinks</option>
+                      <option value="animals">Animals</option>
+                      <option value="nature">Nature & Weather</option>
+                      <option value="videogames">Video Games</option>
+                      <option value="music">Music Artists</option>
+                      <option value="memes">Memes & Internet</option>
+                      <option value="movies">Movies & TV</option>
+                      <option value="technology">Technology</option>
+                      <option value="sports">Sports</option>
+                      <option value="objects">Everyday Objects</option>
+                      <option value="places">Places</option>
+                      <option value="abstract">Abstract Concepts</option>
                     </select>
                   </div>
-                  <div class="option-row">
-                    <label for="opt-clue-time">Clue timer (sec)</label>
+                  <div class="option-group">
+                    <label for="opt-clue-time">Clue Timer (sec)</label>
                     <select id="opt-clue-time">
                       <option value="0" selected>Off</option>
                       <option value="30">30</option>
@@ -127,8 +147,8 @@
                       <option value="120">120</option>
                     </select>
                   </div>
-                  <div class="option-row">
-                    <label for="opt-vote-time">Vote timer (sec)</label>
+                  <div class="option-group">
+                    <label for="opt-vote-time">Vote Timer (sec)</label>
                     <select id="opt-vote-time">
                       <option value="0" selected>Off</option>
                       <option value="30">30</option>
@@ -137,12 +157,12 @@
                       <option value="90">90</option>
                     </select>
                   </div>
-                  <div class="option-row">
-                    <label for="opt-custom-words">Custom words (optional)</label>
-                  </div>
-                  <textarea id="opt-custom-words" rows="2" placeholder="Comma or newline separated, e.g. pizza, dog, moon"></textarea>
                 </div>
-                <ul id="players-list" class="players-list"></ul>
+                <div class="option-group full-width">
+                  <label for="opt-custom-words">Custom Words (optional)</label>
+                  <textarea id="opt-custom-words" rows="3" placeholder="Comma or newline separated, e.g. pizza, dog, moon"></textarea>
+                </div>
+              </div>
               </section>
 
               <section class="panel">

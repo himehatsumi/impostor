@@ -18,7 +18,7 @@ let state = {
   secretWord: null,
   secretTheme: null,
   impostorClue: null,
-  options: { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: '' },
+  options: { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: '', category: 'all' },
   timerEndAt: null,
   timerInterval: null,
   wasHost: false,
@@ -57,7 +57,9 @@ const cluesList = document.getElementById('clues-list');
 const startGameBtn = document.getElementById('start-game-btn');
 const startBotsGameBtn = document.getElementById('start-bots-game-btn');
 const optionsPanel = document.getElementById('options-panel');
+const optionsHeader = document.getElementById('options-header');
 const optMaxRounds = document.getElementById('opt-max-rounds');
+const optCategory = document.getElementById('opt-category');
 const optClueTime = document.getElementById('opt-clue-time');
 const optVoteTime = document.getElementById('opt-vote-time');
 const phaseTimerEl = document.getElementById('phase-timer');
@@ -259,6 +261,7 @@ function updateRoomState(payload) {
   optionsPanel.classList.toggle('hidden', !(isHost && payload.phase === 'lobby'));
   if (payload.options && isHost && payload.phase === 'lobby') {
     optMaxRounds.value = String(payload.options.maxRounds ?? 3);
+    optCategory.value = String(payload.options.category ?? 'all');
     optClueTime.value = String(payload.options.clueTimeLimit ?? 0);
     optVoteTime.value = String(payload.options.voteTimeLimit ?? 0);
     // Only update custom words if the field is not currently focused (being edited)
@@ -653,6 +656,7 @@ function emitRoomOptions() {
     roomCode: state.roomCode,
     options: {
       maxRounds: parseInt(optMaxRounds.value, 10) || 3,
+      category: optCategory.value || 'all',
       clueTimeLimit: parseInt(optClueTime.value, 10) || 0,
       voteTimeLimit: parseInt(optVoteTime.value, 10) || 0,
       customWords: customWords,
@@ -660,7 +664,16 @@ function emitRoomOptions() {
   });
 }
 
-optMaxRounds.addEventListener('change', emitRoomOptions);
+// Debounce max rounds input
+let maxRoundsTimeout = null;
+optMaxRounds.addEventListener('input', () => {
+  if (maxRoundsTimeout) clearTimeout(maxRoundsTimeout);
+  maxRoundsTimeout = setTimeout(() => {
+    emitRoomOptions();
+  }, 300);
+});
+
+optCategory.addEventListener('change', emitRoomOptions);
 optClueTime.addEventListener('change', emitRoomOptions);
 optVoteTime.addEventListener('change', emitRoomOptions);
 
@@ -689,6 +702,16 @@ if (optCustomWords) {
 }
 
 copyCodeBtn.addEventListener('click', copyRoomCode);
+
+// Toggle options panel
+if (optionsHeader) {
+  optionsHeader.addEventListener('click', () => {
+    if (optionsPanel) {
+      optionsPanel.classList.toggle('collapsed');
+    }
+  });
+}
+
 leaveRoomBtn.addEventListener('click', () => {
   if (!state.roomCode) return;
   socket.emit('leaveRoom', { roomCode: state.roomCode });

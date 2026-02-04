@@ -388,6 +388,110 @@ button:disabled {
   padding: 2px 0;
 }
 
+.options-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.options-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.options-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.options-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dropdown-arrow {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.3s ease;
+}
+
+.options-section.collapsed .dropdown-arrow {
+  transform: rotate(-90deg);
+}
+
+.options-content {
+  padding: 0 16px 16px 16px;
+  max-height: 500px;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.options-section.collapsed .options-content {
+  max-height: 0;
+  padding: 0 16px;
+}
+
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.option-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.option-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.option-group input[type="number"],
+.option-group select,
+.option-group textarea {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.option-group input[type="number"]:focus,
+.option-group select:focus,
+.option-group textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.option-group input[type="number"] {
+  width: 100%;
+}
+
+.option-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Legacy options panel styles - keeping for backwards compatibility */
 .options-panel {
   margin-bottom: 12px;
   padding: 10px 12px;

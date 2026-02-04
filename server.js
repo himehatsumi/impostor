@@ -88,6 +88,7 @@ function createRoom(hostSocket, nickname) {
       clueTimeLimit: 0,
       voteTimeLimit: 0,
       customWords: [],
+      category: 'all',
     },
     phaseTimerRef: null,
     disconnectTimers: {},
@@ -220,7 +221,7 @@ function serializeRoomForClients(room) {
       disconnected: !!p.disconnected,
     })),
     options: {
-      ...(room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0 }),
+      ...(room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, category: 'all' }),
       customWords: Array.isArray(room.options?.customWords)
         ? room.options.customWords.join('\n')
         : (room.options?.customWords || ''),
@@ -454,9 +455,11 @@ if (!room.currentWordEntry) {
       ? room.options.customWords
       : null;
 
+  const category = room.options && room.options.category ? room.options.category : 'all';
+
   room.currentWordEntry = customWords
-    ? getRandomWordFromList(customWords) || getRandomWord()
-    : getRandomWord();
+    ? getRandomWordFromList(customWords) || getRandomWord(category)
+    : getRandomWord(category);
 }
 
 // Always generate a new impostor clue from the SAME word
@@ -784,9 +787,12 @@ io.on('connection', (socket) => {
     const player = room.players.find((p) => p.id === socket.id);
     if (!player || !player.isHost || room.phase !== 'lobby') return;
 
-    room.options = room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: [] };
-    if (typeof options.maxRounds === 'number' && options.maxRounds >= 1 && options.maxRounds <= 10) {
+    room.options = room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: [], category: 'all' };
+    if (typeof options.maxRounds === 'number' && options.maxRounds >= 1 && options.maxRounds <= 20) {
       room.options.maxRounds = options.maxRounds;
+    }
+    if (typeof options.category === 'string') {
+      room.options.category = options.category;
     }
     if (typeof options.clueTimeLimit === 'number' && options.clueTimeLimit >= 0 && options.clueTimeLimit <= 300) {
       room.options.clueTimeLimit = options.clueTimeLimit;
