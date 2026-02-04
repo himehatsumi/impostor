@@ -380,6 +380,215 @@ function submitVoteForPlayer(room, voterId, targetId) {
   }
 }
 
+function generateSmartBotClue(room, bot, clueRound) {
+  const isImpostor = bot.id === room.impostorId;
+  const { word, theme, category } = room.currentWordEntry || {};
+
+  if (isImpostor) {
+    // Advanced impostor strategy: Analyze other players' clues to blend in better
+    const otherClues = [];
+    Object.keys(room.clues).forEach((playerId) => {
+      if (playerId !== bot.id && room.clues[playerId] && room.clues[playerId].length > 0) {
+        otherClues.push(...room.clues[playerId]);
+      }
+    });
+
+    // If other players have given clues, try to mimic their style
+    if (otherClues.length > 0 && clueRound === 2) {
+      const hasLetterClues = otherClues.some(c => c.toLowerCase().includes('starts') || c.toLowerCase().includes('ends'));
+      const hasLengthClues = otherClues.some(c => c.toLowerCase().includes('letter'));
+      const hasThemeClues = otherClues.some(c => c.length > 15);
+
+      // Mimic the style of other players
+      if (hasLetterClues && Math.random() > 0.5) {
+        const randomLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+        return Math.random() > 0.5 ? `Starts with ${randomLetter}` : `Ends with ${randomLetter}`;
+      }
+      if (hasLengthClues && Math.random() > 0.6) {
+        const randomLength = 5 + Math.floor(Math.random() * 8);
+        return `${randomLength} letters`;
+      }
+    }
+
+    // Impostor strategy: Give vague clues that sound plausible but don't reveal ignorance
+    const vagueClues = [
+      'You know this one',
+      'Pretty obvious',
+      'Everyone knows',
+      'Super common',
+      'Easy one',
+      'Basic',
+      'Simple',
+      'Straightforward',
+      'Clear choice',
+      'No brainer',
+    ];
+
+    // Category-specific vague clues that sound more natural
+    const categoryVagueClues = {
+      food: ['Yummy', 'Delicious', 'Tastes good', 'Edible thing', 'You can eat it', 'Food item', 'Consumable'],
+      animals: ['Living thing', 'Creature', 'Has life', 'Animal', 'Alive', 'Breathing', 'Wildlife'],
+      nature: ['Outside', 'Natural', 'Outdoors', 'Environment', 'Earth thing', 'Nature'],
+      videogames: ['Gamers know', 'Playable', 'Gaming', 'Video game', 'Digital fun', 'Console/PC'],
+      music: ['Sounds nice', 'Musical', 'Audio', 'You can hear it', 'Rhythm', 'Melody'],
+      memes: ['Internet thing', 'Online', 'Viral', 'Funny', 'Meme culture', 'Social media'],
+      movies: ['On screen', 'Film', 'Cinema', 'Movie', 'Visual', 'Entertainment'],
+      anime: ['Japanese', 'Animated', 'Anime', 'Manga related', 'Otaku knows', 'Eastern'],
+      technology: ['Tech', 'Digital', 'Electronic', 'Modern', 'Computer thing', 'Innovation'],
+      sports: ['Athletic', 'Physical', 'Sport', 'Competition', 'Active', 'Game'],
+      objects: ['Thing', 'Object', 'Item', 'Physical', 'You can touch it', 'Everyday'],
+      places: ['Location', 'Place', 'Destination', 'Geography', 'Area', 'Spot'],
+      abstract: ['Concept', 'Idea', 'Abstract', 'Thought', 'Feeling', 'Mental'],
+    };
+
+    // Mix general and category-specific vague clues
+    let cluePool = [...vagueClues];
+    if (category && categoryVagueClues[category]) {
+      cluePool = [...cluePool, ...categoryVagueClues[category]];
+    }
+
+    // Second round: be slightly more specific but still vague
+    if (clueRound === 2 && category) {
+      cluePool.push(`${category} related`);
+      cluePool.push(`Type of ${category}`);
+      cluePool.push(`In ${category}`);
+      cluePool.push(`${category} thing`);
+    }
+
+    return cluePool[Math.floor(Math.random() * cluePool.length)];
+  }
+
+  // Advanced crewmate strategy: Give specific, varied clues based on the word/theme
+  if (!word || !theme) return 'Related';
+
+  const wordLower = word.toLowerCase();
+  const themeLower = theme.toLowerCase();
+
+  // Generate creative clues based on word characteristics
+  const clues = [];
+
+  // Add theme-based clues with variations
+  clues.push(theme);
+  clues.push(`${theme}!`);
+  clues.push(`It's ${theme}`);
+  
+  // Add descriptive clues based on word length
+  if (wordLower.length <= 4) {
+    clues.push('Short word');
+    clues.push('Only few letters');
+  } else if (wordLower.length >= 10) {
+    clues.push('Long word');
+    clues.push('Many letters');
+  } else if (wordLower.length >= 6 && wordLower.length <= 9) {
+    clues.push('Medium length');
+  }
+
+  // Add letter-based clues
+  const firstLetter = wordLower[0].toUpperCase();
+  const lastLetter = wordLower[wordLower.length - 1].toUpperCase();
+  clues.push(`Starts with ${firstLetter}`);
+  clues.push(`Ends with ${lastLetter}`);
+  clues.push(`${firstLetter}...`);
+  clues.push(`...${lastLetter}`);
+  clues.push(`${firstLetter} to ${lastLetter}`);
+
+  // Add vowel/consonant patterns
+  const vowels = 'aeiou';
+  const vowelCount = wordLower.split('').filter(c => vowels.includes(c)).length;
+  if (vowelCount <= 2) {
+    clues.push('Few vowels');
+  } else if (vowelCount >= 4) {
+    clues.push('Many vowels');
+  }
+
+  // Add syllable/sound clues
+  if (wordLower.includes('oo')) clues.push('Has "oo"');
+  if (wordLower.includes('ee')) clues.push('Has "ee"');
+  if (wordLower.includes('ing')) clues.push('Ends -ing');
+  if (wordLower.includes('er')) clues.push('Has "er"');
+  if (wordLower.includes('tion')) clues.push('Has -tion');
+  if (wordLower.includes('ly')) clues.push('Has "ly"');
+
+  // Add double letter clues
+  for (let i = 0; i < wordLower.length - 1; i++) {
+    if (wordLower[i] === wordLower[i + 1]) {
+      clues.push(`Double ${wordLower[i].toUpperCase()}`);
+      clues.push('Has double letter');
+      break;
+    }
+  }
+
+  // Add category-specific creative clues
+  if (category === 'food') {
+    clues.push('Edible', 'Cuisine', 'You eat this', 'Kitchen', 'Meal', 'Tasty');
+  } else if (category === 'animals') {
+    clues.push('Living being', 'Creature', 'Fauna', 'Wildlife', 'Has life', 'Animal kingdom');
+  } else if (category === 'nature') {
+    clues.push('Natural world', 'Outdoors', 'Environment', 'Earth', 'Nature', 'Outside');
+  } else if (category === 'videogames') {
+    clues.push('Gaming', 'Console/PC', 'Playable', 'Virtual', 'Gamers know', 'Video game');
+  } else if (category === 'music') {
+    clues.push('Audio', 'Musical', 'Sounds', 'Rhythm', 'Artist/Song', 'Melody');
+  } else if (category === 'memes') {
+    clues.push('Internet', 'Viral', 'Online humor', 'Social media', 'Gen Z', 'Meme');
+  } else if (category === 'movies') {
+    clues.push('Cinema', 'Film', 'Screen', 'Hollywood', 'Movie', 'Entertainment');
+  } else if (category === 'anime') {
+    clues.push('Japanese', 'Manga', 'Otaku', 'Animated', 'Eastern', 'Anime');
+  } else if (category === 'technology') {
+    clues.push('Digital', 'Electronic', 'Tech', 'Computer', 'Modern', 'Innovation');
+  } else if (category === 'sports') {
+    clues.push('Athletic', 'Competition', 'Physical', 'Sport', 'Game', 'Team/Solo');
+  } else if (category === 'objects') {
+    clues.push('Thing', 'Item', 'Object', 'Tool', 'Device', 'Everyday');
+  } else if (category === 'places') {
+    clues.push('Location', 'Geography', 'Destination', 'Place', 'Map', 'Travel');
+  } else if (category === 'abstract') {
+    clues.push('Concept', 'Idea', 'Feeling', 'Intangible', 'Mental', 'Abstract');
+  }
+
+  // Add word association clues
+  clues.push(`Think: ${theme}`);
+  clues.push(`Hint: ${theme}`);
+  clues.push(`About ${theme}`);
+  
+  // Second round: more direct and helpful clues
+  if (clueRound === 2) {
+    clues.push(`Definitely ${theme}`);
+    clues.push(`Obviously ${theme}`);
+    clues.push(`Clearly ${theme}`);
+    clues.push(`100% ${theme}`);
+    clues.push(`${word.length} letters`);
+    clues.push(`${firstLetter}... ${lastLetter}`);
+    clues.push(`${word.length} letter word`);
+    
+    // Add partial word hints (first 2-3 letters)
+    if (wordLower.length >= 5) {
+      clues.push(`${wordLower.substring(0, 2)}...`);
+      clues.push(`Starts ${wordLower.substring(0, 2)}`);
+      if (wordLower.length >= 7) {
+        clues.push(`${wordLower.substring(0, 3)}...`);
+        clues.push(`Begins ${wordLower.substring(0, 3)}`);
+      }
+    }
+
+    // Add rhyme hints
+    const lastTwoLetters = wordLower.slice(-2);
+    clues.push(`Rhymes with ...${lastTwoLetters}`);
+    
+    // Add word structure hints
+    if (wordLower.includes(' ')) {
+      clues.push('Multiple words');
+      clues.push('Has space');
+    } else {
+      clues.push('Single word');
+      clues.push('No spaces');
+    }
+  }
+
+  return clues[Math.floor(Math.random() * clues.length)];
+}
+
 function scheduleBotClues(room) {
   const currentClueRound = room.clueRound;
   const bots = room.players.filter((p) => p.isBot && p.alive && !p.disconnected);
@@ -390,26 +599,126 @@ function scheduleBotClues(room) {
     setTimeout(() => {
       if (room.phase !== 'clue' || room.clueRound !== currentClueRound) return;
 
-      let clue = '';
-      if (bot.id === room.impostorId) {
-        // Impostor bot: vague category-based clue.
-        clue = room.impostorClue || 'Something related but not obvious.';
-      } else if (room.currentWordEntry) {
-        const { theme, category } = room.currentWordEntry;
-        if (category) {
-          clue = `Think of ${category} things.`;
-        } else if (theme) {
-          clue = `Related to: ${theme}`;
-        } else {
-          clue = 'Close to the hidden word.';
-        }
-      } else {
-        clue = 'Related to the secret word.';
-      }
-
+      const clue = generateSmartBotClue(room, bot, currentClueRound);
       submitClueForPlayer(room, bot.id, clue);
     }, delayMs);
   });
+}
+
+function analyzeSuspiciousClues(room) {
+  // Advanced suspicion analysis system
+  const suspicionScores = new Map();
+  const alivePlayers = getAliveConnectedPlayers(room);
+  
+  // Define suspicious patterns
+  const vagueWords = ['popular', 'classic', 'well-known', 'common', 'typical', 'standard', 
+                      'familiar', 'recognizable', 'mainstream', 'related', 'thing', 'stuff',
+                      'obvious', 'easy', 'simple', 'basic', 'everyone', 'super', 'pretty'];
+  
+  const specificIndicators = ['starts', 'ends', 'letters', 'letter', 'sound', 'vowel', 
+                               'double', 'rhyme', 'begins', 'syllable'];
+  
+  alivePlayers.forEach((player) => {
+    let suspicion = 0;
+    const playerClues = room.clues[player.id] || [];
+    
+    // Track clue patterns
+    let hasSpecificClue = false;
+    let hasVagueClue = false;
+    let totalClueLength = 0;
+    
+    playerClues.forEach((clue) => {
+      const clueLower = clue.toLowerCase();
+      const clueWords = clue.trim().split(/\s+/);
+      totalClueLength += clue.length;
+      
+      // HIGH SUSPICION: Very vague/generic clues
+      if (vagueWords.some(word => clueLower.includes(word))) {
+        suspicion += 3;
+        hasVagueClue = true;
+      }
+      
+      // MEDIUM SUSPICION: Very short clues without specific info
+      if (clueWords.length <= 2 && !specificIndicators.some(ind => clueLower.includes(ind))) {
+        suspicion += 2;
+      }
+      
+      // HIGH SUSPICION: Empty or useless clues
+      if (!clue.trim() || clueLower === 'idk' || clueLower === 'dunno' || clueLower === '?') {
+        suspicion += 5;
+      }
+      
+      // MEDIUM SUSPICION: Category-only clues
+      const categories = ['food', 'animal', 'nature', 'game', 'music', 'meme', 'movie', 'anime', 'tech', 'sport', 'object', 'place'];
+      if (categories.some(cat => clueLower === cat || clueLower === `${cat}s` || clueLower === `${cat} thing`)) {
+        suspicion += 2;
+      }
+      
+      // MEDIUM SUSPICION: Contradictory clues between rounds
+      if (playerClues.length === 2) {
+        const firstClue = playerClues[0].toLowerCase();
+        const secondClue = playerClues[1].toLowerCase();
+        
+        // Check for letter contradictions
+        const firstHasLetter = firstClue.match(/starts with ([a-z])/i);
+        const secondHasLetter = secondClue.match(/starts with ([a-z])/i);
+        if (firstHasLetter && secondHasLetter && firstHasLetter[1] !== secondHasLetter[1]) {
+          suspicion += 4; // Contradictory letters = very suspicious
+        }
+        
+        // Check for length contradictions
+        const firstHasLength = firstClue.match(/(\d+) letter/);
+        const secondHasLength = secondClue.match(/(\d+) letter/);
+        if (firstHasLength && secondHasLength && firstHasLength[1] !== secondHasLength[1]) {
+          suspicion += 4; // Contradictory lengths = very suspicious
+        }
+      }
+      
+      // LOW SUSPICION: Overly helpful clues (might be impostor overcompensating)
+      if (clueLower.match(/^[a-z]{3,}\.\.\.$/)) {
+        // Giving away too much of the word
+        suspicion += 1;
+      }
+    });
+    
+    // Reduce suspicion for players with specific clues
+    playerClues.forEach((clue) => {
+      const clueLower = clue.toLowerCase();
+      
+      // REDUCE: Specific indicators (letters, lengths, sounds)
+      if (specificIndicators.some(ind => clueLower.includes(ind))) {
+        suspicion = Math.max(0, suspicion - 3);
+        hasSpecificClue = true;
+      }
+      
+      // REDUCE: Long, detailed theme-based clues
+      if (clue.length > 15 && !vagueWords.some(word => clueLower.includes(word))) {
+        suspicion = Math.max(0, suspicion - 2);
+      }
+      
+      // REDUCE: Clues with punctuation (shows effort/emotion)
+      if (clue.includes('!') || clue.includes('?')) {
+        suspicion = Math.max(0, suspicion - 1);
+      }
+    });
+    
+    // Pattern analysis: Impostor often gives vague first clue, then tries to blend in
+    if (playerClues.length === 2 && hasVagueClue && hasSpecificClue) {
+      suspicion += 2; // Suspicious pattern change
+    }
+    
+    // Average clue length analysis
+    if (playerClues.length > 0) {
+      const avgLength = totalClueLength / playerClues.length;
+      if (avgLength < 8) {
+        suspicion += 1; // Very short average = suspicious
+      }
+    }
+    
+    suspicionScores.set(player.id, Math.max(0, suspicion));
+  });
+  
+  return suspicionScores;
 }
 
 function scheduleBotVotes(room) {
@@ -417,19 +726,116 @@ function scheduleBotVotes(room) {
   if (!bots.length) return;
 
   const alivePlayers = getAliveConnectedPlayers(room);
+  const suspicionScores = analyzeSuspiciousClues(room);
 
   bots.forEach((bot, index) => {
-    // Small delay before bots cast their votes.
     const delayMs = 1500 + index * 700 + Math.floor(Math.random() * 1200);
     setTimeout(() => {
       if (room.phase !== 'voting') return;
 
-      // Simple heuristic: randomly pick another (alive) player.
+      const isImpostorBot = bot.id === room.impostorId;
       const possibleTargets = alivePlayers.filter((p) => p.id !== bot.id);
+      
+      if (!possibleTargets.length) {
+        submitVoteForPlayer(room, bot.id, 'skip');
+        return;
+      }
+
       let targetId = 'skip';
-      if (possibleTargets.length) {
-        const pick = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
-        targetId = pick.id;
+
+      if (isImpostorBot) {
+        // Advanced impostor bot strategy: Strategic voting to survive
+        
+        // Find who's voting for the impostor (if any votes are visible)
+        const votingForImpostor = alivePlayers.filter((p) => room.votes[p.id] === bot.id);
+        
+        // Priority 1: Vote for someone who's voting for you (self-defense)
+        if (votingForImpostor.length > 0 && Math.random() > 0.2) {
+          targetId = votingForImpostor[Math.floor(Math.random() * votingForImpostor.length)].id;
+        } else {
+          // Priority 2: Vote for players with very specific clues (deflection)
+          const specificCluePlayers = possibleTargets.filter((p) => {
+            const clues = room.clues[p.id] || [];
+            return clues.some(c => 
+              c.includes('starts with') || 
+              c.includes('ends with') || 
+              c.includes('letters') ||
+              c.match(/^[a-z]{3,}\.\.\.$/i) // Partial word reveals
+            );
+          });
+          
+          if (specificCluePlayers.length > 0 && Math.random() > 0.25) {
+            // 75% chance to vote for someone with specific clues
+            targetId = specificCluePlayers[Math.floor(Math.random() * specificCluePlayers.length)].id;
+          } else {
+            // Priority 3: Vote for non-bot players (humans are easier to frame)
+            const humanTargets = possibleTargets.filter(p => !p.isBot);
+            if (humanTargets.length > 0 && Math.random() > 0.3) {
+              targetId = humanTargets[Math.floor(Math.random() * humanTargets.length)].id;
+            } else {
+              // Priority 4: Random vote or skip to blend in
+              if (Math.random() > 0.35) {
+                targetId = possibleTargets[Math.floor(Math.random() * possibleTargets.length)].id;
+              } else {
+                targetId = 'skip';
+              }
+            }
+          }
+        }
+      } else {
+        // Advanced crewmate bot strategy: Smart voting based on multiple factors
+        const targetScores = possibleTargets.map((p) => ({
+          player: p,
+          suspicion: suspicionScores.get(p.id) || 0,
+        }));
+
+        // Sort by suspicion (highest first)
+        targetScores.sort((a, b) => b.suspicion - a.suspicion);
+
+        const highestSuspicion = targetScores[0].suspicion;
+        const secondHighestSuspicion = targetScores.length > 1 ? targetScores[1].suspicion : 0;
+
+        // Advanced voting logic based on suspicion levels
+        const rand = Math.random();
+        
+        if (highestSuspicion >= 5) {
+          // Very high suspicion: 85% vote for them
+          if (rand > 0.15) {
+            targetId = targetScores[0].player.id;
+          } else {
+            targetId = 'skip';
+          }
+        } else if (highestSuspicion >= 3) {
+          // High suspicion: 70% vote for them, 20% for second, 10% skip
+          if (rand > 0.3) {
+            targetId = targetScores[0].player.id;
+          } else if (targetScores.length > 1 && rand > 0.1) {
+            targetId = targetScores[1].player.id;
+          } else {
+            targetId = 'skip';
+          }
+        } else if (highestSuspicion >= 1) {
+          // Medium suspicion: 50% vote for them, 30% for second, 20% skip
+          if (rand > 0.5) {
+            targetId = targetScores[0].player.id;
+          } else if (targetScores.length > 1 && secondHighestSuspicion >= 1 && rand > 0.2) {
+            targetId = targetScores[1].player.id;
+          } else {
+            targetId = 'skip';
+          }
+        } else {
+          // Low suspicion overall: 30% random vote, 70% skip
+          if (rand > 0.7) {
+            targetId = possibleTargets[Math.floor(Math.random() * possibleTargets.length)].id;
+          } else {
+            targetId = 'skip';
+          }
+        }
+
+        // Special case: If it's the last round and no clear suspect, vote randomly
+        if (room.roundNumber >= room.maxRounds && highestSuspicion < 2 && Math.random() > 0.5) {
+          targetId = possibleTargets[Math.floor(Math.random() * possibleTargets.length)].id;
+        }
       }
 
       submitVoteForPlayer(room, bot.id, targetId);
