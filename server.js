@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const { getRandomWord, getRandomWordFromList, generateImpostorClue } = require('./words');
+const { getRandomWord, getRandomWordFromList, generateImpostorClue } = require('./words/index');
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMITS = { createRoom: 5, joinRoom: 10, submitClue: 30, submitVote: 30 };
