@@ -294,7 +294,24 @@ function submitClueForPlayer(room, playerId, clueText) {
   // Prevent multiple submissions per clue round.
   if (room.clues[player.id].length >= room.clueRound) return;
 
-  room.clues[player.id].push(String(clueText || '').trim());
+  const clue = String(clueText || '').trim();
+  
+  // Prevent submitting the secret word as a clue (case-insensitive)
+  if (room.currentWordEntry && room.currentWordEntry.word) {
+    const secretWord = room.currentWordEntry.word.toLowerCase();
+    const submittedClue = clue.toLowerCase();
+    
+    if (submittedClue === secretWord) {
+      // Send error message to the player who tried to submit the word
+      const socket = io.sockets.sockets.get(playerId);
+      if (socket) {
+        socket.emit('errorMessage', 'You cannot submit the secret word as a clue!');
+      }
+      return;
+    }
+  }
+
+  room.clues[player.id].push(clue);
 
   // Broadcast updated clues to everyone so all players can see
   // each other's submissions as they come in.
@@ -780,7 +797,7 @@ io.on('connection', (socket) => {
     if (options.customWords !== undefined) {
       const raw = typeof options.customWords === 'string' ? options.customWords : String(options.customWords || '');
       room.options.customWords = raw
-        .split(/[\s,]+/)
+        .split(/[,\n]+/)
         .map((w) => w.trim())
         .filter(Boolean);
     }

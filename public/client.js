@@ -81,6 +81,17 @@ function isMeAlive() {
   return !!(me && me.alive);
 }
 
+function validateClue(clueText) {
+  if (!clueText || !clueText.trim()) return { valid: false, error: 'Please enter a clue.' };
+  
+  // Check if the clue is the secret word (case-insensitive)
+  if (state.secretWord && clueText.trim().toLowerCase() === state.secretWord.toLowerCase()) {
+    return { valid: false, error: 'You cannot submit the secret word as a clue!' };
+  }
+  
+  return { valid: true };
+}
+
 function showLobby() {
   lobbyScreen.classList.remove('hidden');
   gameScreen.classList.add('hidden');
@@ -250,7 +261,10 @@ function updateRoomState(payload) {
     optMaxRounds.value = String(payload.options.maxRounds ?? 3);
     optClueTime.value = String(payload.options.clueTimeLimit ?? 0);
     optVoteTime.value = String(payload.options.voteTimeLimit ?? 0);
-    if (optCustomWords) optCustomWords.value = payload.options.customWords || '';
+    // Only update custom words if the field is not currently focused (being edited)
+    if (optCustomWords && document.activeElement !== optCustomWords) {
+      optCustomWords.value = payload.options.customWords || '';
+    }
   }
 
   // Show clue/ack/voting only when game has started; otherwise show waiting.
@@ -649,7 +663,30 @@ function emitRoomOptions() {
 optMaxRounds.addEventListener('change', emitRoomOptions);
 optClueTime.addEventListener('change', emitRoomOptions);
 optVoteTime.addEventListener('change', emitRoomOptions);
-if (optCustomWords) optCustomWords.addEventListener('input', () => { if (state.roomCode && state.players.find((p) => p.id === state.playerId)?.isHost) emitRoomOptions(); });
+
+// Debounce custom words input to avoid overwriting while typing
+if (optCustomWords) {
+  let customWordsTimeout = null;
+  optCustomWords.addEventListener('input', () => {
+    if (!state.roomCode || !state.players.find((p) => p.id === state.playerId)?.isHost) return;
+    
+    // Clear previous timeout
+    if (customWordsTimeout) clearTimeout(customWordsTimeout);
+    
+    // Wait 500ms after user stops typing before sending update
+    customWordsTimeout = setTimeout(() => {
+      emitRoomOptions();
+    }, 500);
+  });
+  
+  // Also send update when user leaves the field
+  optCustomWords.addEventListener('blur', () => {
+    if (customWordsTimeout) clearTimeout(customWordsTimeout);
+    if (state.roomCode && state.players.find((p) => p.id === state.playerId)?.isHost) {
+      emitRoomOptions();
+    }
+  });
+}
 
 copyCodeBtn.addEventListener('click', copyRoomCode);
 leaveRoomBtn.addEventListener('click', () => {
@@ -681,11 +718,17 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     if (document.activeElement === clueInput && state.phase === 'clue' && isMeAlive()) {
       e.preventDefault();
-      if (clueInput.value.trim()) {
-        submitClueBtn.disabled = true;
-        socket.emit('submitClue', { roomCode: state.roomCode, clueText: clueInput.value.trim() });
-        logStatus('Clue submitted. Waiting for others...');
+      const clueText = clueInput.value.trim();
+      const validation = validateClue(clueText);
+      
+      if (!validation.valid) {
+        logStatus(`Error: ${validation.error}`);
+        return;
       }
+      
+      submitClueBtn.disabled = true;
+      socket.emit('submitClue', { roomCode: state.roomCode, clueText });
+      logStatus('Clue submitted. Waiting for others...');
     }
     if (document.activeElement && document.activeElement.closest('#vote-options') && state.phase === 'voting' && isMeAlive()) {
       const checked = document.querySelector("input[name='vote-target']:checked");
@@ -729,9 +772,18 @@ if (impostorGuessSubmit && impostorGuessInput) {
 }
 
 submitClueBtn.addEventListener('click', () => {
-  if (!state.roomCode || !clueInput.value.trim() || !isMeAlive()) return;
+  if (!state.roomCode || !isMeAlive()) return;
+  
+  const clueText = clueInput.value.trim();
+  const validation = validateClue(clueText);
+  
+  if (!validation.valid) {
+    logStatus(`Error: ${validation.error}`);
+    return;
+  }
+  
   submitClueBtn.disabled = true;
-  socket.emit('submitClue', { roomCode: state.roomCode, clueText: clueInput.value.trim() });
+  socket.emit('submitClue', { roomCode: state.roomCode, clueText });
   logStatus('Clue submitted. Waiting for others...');
 });
 
