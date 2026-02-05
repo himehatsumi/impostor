@@ -66,7 +66,7 @@ const phaseTimerEl = document.getElementById('phase-timer');
 const waitingPhaseEl = document.getElementById('waiting-phase');
 const copyCodeBtn = document.getElementById('copy-code-btn');
 const leaveRoomBtn = document.getElementById('leave-room-btn');
-const howToPlayBtn = document.getElementById('how-to-play-btn');
+const howToPlayBtnLobby = document.getElementById('how-to-play-btn-lobby');
 const howToPlayModal = document.getElementById('how-to-play-modal');
 const howToPlayClose = document.getElementById('how-to-play-close');
 const soundMuteCheckbox = document.getElementById('sound-mute');
@@ -812,10 +812,14 @@ leaveRoomBtn.addEventListener('click', () => {
   socket.emit('leaveRoom', { roomCode: state.roomCode });
 });
 
-howToPlayBtn.addEventListener('click', () => {
-  howToPlayModal.classList.remove('hidden');
-  howToPlayModal.setAttribute('aria-hidden', 'false');
-});
+// Lobby how-to-play button
+if (howToPlayBtnLobby) {
+  howToPlayBtnLobby.addEventListener('click', () => {
+    howToPlayModal.classList.remove('hidden');
+    howToPlayModal.setAttribute('aria-hidden', 'false');
+  });
+}
+
 howToPlayClose.addEventListener('click', () => {
   howToPlayModal.classList.add('hidden');
   howToPlayModal.setAttribute('aria-hidden', 'true');

@@ -12,12 +12,11 @@
     <div id="app">
       <header class="app-header">
         <h1>Impostor</h1>
-        <button type="button" id="how-to-play-btn" class="text-btn">How to play</button>
       </header>
 
       <main class="app-main">
         <!-- Start / Join -->
-        <section id="lobby-screen" class="card">
+        <section id="lobby-screen" class="card lobby-centered">
           <h2>Start or Join</h2>
           <div class="form-row">
             <label for="nickname">Name</label>
@@ -28,8 +27,28 @@
             <span class="or-label">or</span>
             <input id="join-code" type="text" placeholder="Code" maxlength="4" class="room-input" />
             <button id="join-btn" class="secondary">Join</button>
+            <button type="button" id="how-to-play-btn-lobby" class="secondary">How to play</button>
           </div>
           <p id="lobby-error" class="error-text"></p>
+          
+          <!-- Game Info Section -->
+          <div class="lobby-info">
+            <div class="info-card">
+              <h3>What is Impostor?</h3>
+              <p>A social deduction word game where one player doesn't know the secret word. Can you find the impostor before they figure it out?</p>
+            </div>
+            
+            <div class="info-card">
+              <h3>Quick Start</h3>
+              <ol class="quick-start-list">
+                <li><strong>Create</strong> a room and share the code with friends</li>
+                <li><strong>Join</strong> using the 4-letter code</li>
+                <li><strong>Start</strong> the game when everyone is ready</li>
+                <li><strong>Give clues</strong> about your word (or fake it!)</li>
+                <li><strong>Vote</strong> for who you think is the impostor</li>
+              </ol>
+            </div>
+          </div>
         </section>
 
         <!-- Game -->
@@ -189,10 +208,24 @@
         <div class="modal-backdrop"></div>
         <div class="modal-content">
           <h2>How to play</h2>
-          <p><strong>Roles:</strong> Everyone gets the same secret word except one <strong>Impostor</strong>, who gets a related clue instead.</p>
-          <p><strong>Clues:</strong> Each round has two clue phases. Give a short clue about the word without saying it. The impostor tries to blend in.</p>
-          <p><strong>Voting:</strong> After clues, everyone votes for who they think is the impostor, or Skip to eliminate no one.</p>
-          <p><strong>Winning:</strong> Crewmates win by voting out the impostor. The impostor wins by surviving all rounds or by correctly guessing the secret word at any time during the game.</p>
+          
+          <h3>Roles</h3>
+          <p><strong>Crewmates:</strong> Everyone gets the same secret word and must give clues about it.</p>
+          <p><strong>Impostor:</strong> One player doesn't know the word. They get a related clue instead and must blend in by giving fake clues.</p>
+          
+          <h3>Gameplay</h3>
+          <p><strong>Round Structure:</strong> Each round has two clue phases where players give short hints about their word (or fake it if you're the impostor).</p>
+          <p><strong>Clue Rules:</strong> You cannot say the secret word itself or any part of it. Be creative but not too obvious!</p>
+          <p><strong>Discussion:</strong> After clues are submitted, discuss with other players to figure out who seems suspicious.</p>
+          
+          <h3>Voting</h3>
+          <p>After both clue rounds, everyone votes for who they think is the impostor. You can also vote to skip and eliminate no one.</p>
+          <p>The player with the most votes is eliminated. If there's a tie or majority skip, no one is eliminated.</p>
+          
+          <h3>Winning</h3>
+          <p><strong>Crewmates win</strong> by voting out the impostor before the rounds end.</p>
+          <p><strong>Impostor wins</strong> by surviving all rounds OR by correctly guessing the secret word at any time during the game.</p>
+          
           <button type="button" id="how-to-play-close" class="primary">Got it</button>
         </div>
       </div>
