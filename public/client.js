@@ -528,10 +528,10 @@ function enterVotingPhase(cluePayload) {
   // Render clues with names
   renderClues(cluePayload.clues || []);
 
-  // Render voting options (alive players only)
+  // Render voting options (alive players only, excluding yourself)
   voteOptionsEl.innerHTML = '';
   state.players
-    .filter((p) => p.alive)
+    .filter((p) => p.alive && p.id !== state.playerId) // Cannot vote for yourself
     .forEach((p) => {
       const label = document.createElement('label');
       label.className = 'vote-option';
@@ -542,7 +542,7 @@ function enterVotingPhase(cluePayload) {
       input.value = p.id;
 
       label.appendChild(input);
-      label.appendChild(document.createTextNode(`${p.name}${p.id === state.playerId ? ' (You)' : ''}`));
+      label.appendChild(document.createTextNode(p.name));
       voteOptionsEl.appendChild(label);
     });
 
@@ -846,6 +846,7 @@ document.addEventListener('keydown', (e) => {
       
       submitClueBtn.disabled = true;
       socket.emit('submitClue', { roomCode: state.roomCode, clueText });
+      clueInput.value = ''; // Clear input after submission
       logStatus('Clue submitted. Waiting for others...');
     }
     if (document.activeElement && document.activeElement.closest('#vote-options') && state.phase === 'voting' && isMeAlive()) {
@@ -902,6 +903,7 @@ submitClueBtn.addEventListener('click', () => {
   
   submitClueBtn.disabled = true;
   socket.emit('submitClue', { roomCode: state.roomCode, clueText });
+  clueInput.value = ''; // Clear input after submission
   logStatus('Clue submitted. Waiting for others...');
 });
 

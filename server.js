@@ -112,14 +112,24 @@ function removePlayerFromRoom(room, playerId, reason) {
   const idx = room.players.findIndex((p) => p.id === playerId);
   if (idx === -1) return;
   const [removed] = room.players.splice(idx, 1);
+  
+  // Clear disconnect timer for this player
   if (room.disconnectTimers && room.disconnectTimers[playerId]) {
     clearTimeout(room.disconnectTimers[playerId]);
     delete room.disconnectTimers[playerId];
   }
+  
+  // If room is empty, clean up all timers and delete room
   if (room.players.length === 0) {
+    clearPhaseTimer(room);
+    // Clear all remaining disconnect timers
+    if (room.disconnectTimers) {
+      Object.values(room.disconnectTimers).forEach(timer => clearTimeout(timer));
+    }
     rooms.delete(room.code);
     return;
   }
+  
   if (removed.isHost) {
     room.players[0].isHost = true;
     room.hostId = room.players[0].id;
@@ -285,6 +295,14 @@ function ensureMinimumPlayersWithBots(room, minPlayers) {
   }
 }
 
+function sanitizeInput(input, maxLength = 100) {
+  if (!input) return '';
+  return String(input)
+    .trim()
+    .slice(0, maxLength)
+    .replace(/[<>]/g, ''); // Basic XSS prevention
+}
+
 function submitClueForPlayer(room, playerId, clueText) {
   const player = room.players.find((p) => p.id === playerId && p.alive);
   if (!player || room.phase !== 'clue') return;
@@ -295,7 +313,7 @@ function submitClueForPlayer(room, playerId, clueText) {
   // Prevent multiple submissions per clue round.
   if (room.clues[player.id].length >= room.clueRound) return;
 
-  const clue = String(clueText || '').trim();
+  const clue = sanitizeInput(clueText, 200);
   
   // Prevent submitting the secret word as a clue (case-insensitive)
   if (room.currentWordEntry && room.currentWordEntry.word) {
@@ -552,7 +570,7 @@ function generateSmartBotClue(room, bot, clueRound) {
   clues.push(`Hint: ${theme}`);
   clues.push(`About ${theme}`);
   
-  // Second round: more direct and helpful clues
+  // Second round: more direct and helpful clues (but don't reveal the word)
   if (clueRound === 2) {
     clues.push(`Definitely ${theme}`);
     clues.push(`Obviously ${theme}`);
@@ -562,19 +580,10 @@ function generateSmartBotClue(room, bot, clueRound) {
     clues.push(`${firstLetter}... ${lastLetter}`);
     clues.push(`${word.length} letter word`);
     
-    // Add partial word hints (first 2-3 letters)
-    if (wordLower.length >= 5) {
-      clues.push(`${wordLower.substring(0, 2)}...`);
-      clues.push(`Starts ${wordLower.substring(0, 2)}`);
-      if (wordLower.length >= 7) {
-        clues.push(`${wordLower.substring(0, 3)}...`);
-        clues.push(`Begins ${wordLower.substring(0, 3)}`);
-      }
-    }
-
-    // Add rhyme hints
+    // Add rhyme hints (last 2 letters only, not revealing)
     const lastTwoLetters = wordLower.slice(-2);
     clues.push(`Rhymes with ...${lastTwoLetters}`);
+    clues.push(`Ends ...${lastTwoLetters}`);
     
     // Add word structure hints
     if (wordLower.includes(' ')) {
@@ -584,6 +593,11 @@ function generateSmartBotClue(room, bot, clueRound) {
       clues.push('Single word');
       clues.push('No spaces');
     }
+    
+    // Add more specific theme clues instead of partial words
+    clues.push(`Very ${theme}`);
+    clues.push(`Totally ${theme}`);
+    clues.push(`Exactly ${theme}`);
   }
 
   return clues[Math.floor(Math.random() * clues.length)];
@@ -749,35 +763,43 @@ function scheduleBotVotes(room) {
         // Find who's voting for the impostor (if any votes are visible)
         const votingForImpostor = alivePlayers.filter((p) => room.votes[p.id] === bot.id);
         
-        // Priority 1: Vote for someone who's voting for you (self-defense)
-        if (votingForImpostor.length > 0 && Math.random() > 0.2) {
-          targetId = votingForImpostor[Math.floor(Math.random() * votingForImpostor.length)].id;
+        // Filter out self from possible targets (impostor shouldn't vote for themselves)
+        const nonSelfTargets = possibleTargets.filter(p => p.id !== bot.id);
+        
+        if (nonSelfTargets.length === 0) {
+          // If only self is left, skip
+          targetId = 'skip';
         } else {
-          // Priority 2: Vote for players with very specific clues (deflection)
-          const specificCluePlayers = possibleTargets.filter((p) => {
-            const clues = room.clues[p.id] || [];
-            return clues.some(c => 
-              c.includes('starts with') || 
-              c.includes('ends with') || 
-              c.includes('letters') ||
-              c.match(/^[a-z]{3,}\.\.\.$/i) // Partial word reveals
-            );
-          });
-          
-          if (specificCluePlayers.length > 0 && Math.random() > 0.25) {
-            // 75% chance to vote for someone with specific clues
-            targetId = specificCluePlayers[Math.floor(Math.random() * specificCluePlayers.length)].id;
+          // Priority 1: Vote for someone who's voting for you (self-defense)
+          if (votingForImpostor.length > 0 && Math.random() > 0.2) {
+            targetId = votingForImpostor[Math.floor(Math.random() * votingForImpostor.length)].id;
           } else {
-            // Priority 3: Vote for non-bot players (humans are easier to frame)
-            const humanTargets = possibleTargets.filter(p => !p.isBot);
-            if (humanTargets.length > 0 && Math.random() > 0.3) {
-              targetId = humanTargets[Math.floor(Math.random() * humanTargets.length)].id;
+            // Priority 2: Vote for players with very specific clues (deflection)
+            const specificCluePlayers = nonSelfTargets.filter((p) => {
+              const clues = room.clues[p.id] || [];
+              return clues.some(c => 
+                c.includes('starts with') || 
+                c.includes('ends with') || 
+                c.includes('letters') ||
+                c.match(/^[a-z]{3,}\.\.\.$/i) // Partial word reveals
+              );
+            });
+            
+            if (specificCluePlayers.length > 0 && Math.random() > 0.25) {
+              // 75% chance to vote for someone with specific clues
+              targetId = specificCluePlayers[Math.floor(Math.random() * specificCluePlayers.length)].id;
             } else {
-              // Priority 4: Random vote or skip to blend in
-              if (Math.random() > 0.35) {
-                targetId = possibleTargets[Math.floor(Math.random() * possibleTargets.length)].id;
+              // Priority 3: Vote for non-bot players (humans are easier to frame)
+              const humanTargets = nonSelfTargets.filter(p => !p.isBot);
+              if (humanTargets.length > 0 && Math.random() > 0.3) {
+                targetId = humanTargets[Math.floor(Math.random() * humanTargets.length)].id;
               } else {
-                targetId = 'skip';
+                // Priority 4: Random vote or skip to blend in
+                if (Math.random() > 0.35) {
+                  targetId = nonSelfTargets[Math.floor(Math.random() * nonSelfTargets.length)].id;
+                } else {
+                  targetId = 'skip';
+                }
               }
             }
           }
@@ -853,25 +875,23 @@ function startNewRound(room) {
   room.votes = {};
   room.acks = {};
 
-if (!room.currentWordEntry) {
-  const customWords =
-    room.options &&
-    Array.isArray(room.options.customWords) &&
-    room.options.customWords.length >= 1
-      ? room.options.customWords
-      : null;
+  if (!room.currentWordEntry) {
+    const customWords =
+      room.options &&
+      Array.isArray(room.options.customWords) &&
+      room.options.customWords.length >= 1
+        ? room.options.customWords.filter(w => w && w.trim()) // Filter empty strings
+        : null;
 
-  const category = room.options && room.options.category ? room.options.category : 'all';
+    const category = room.options && room.options.category ? room.options.category : 'all';
 
-  room.currentWordEntry = customWords
-    ? getRandomWordFromList(customWords) || getRandomWord(category)
-    : getRandomWord(category);
-}
+    room.currentWordEntry = customWords && customWords.length > 0
+      ? getRandomWordFromList(customWords) || getRandomWord(category)
+      : getRandomWord(category);
+  }
 
-// Always generate a new impostor clue from the SAME word
-room.impostorClue = generateImpostorClue(room.currentWordEntry);
-
-  
+  // Always generate a new impostor clue from the SAME word
+  room.impostorClue = generateImpostorClue(room.currentWordEntry);
 
   const alivePlayers = getAliveConnectedPlayers(room);
   if (!room.impostorId) {
@@ -1045,7 +1065,7 @@ io.on('connection', (socket) => {
       socket.emit('rateLimit', 'Too many rooms created. Please wait.');
       return;
     }
-    const name = (nickname || '').trim() || 'Host';
+    const name = sanitizeInput(nickname, 20) || 'Host';
     const room = createRoom(socket, name);
     if (typeof callback === 'function') {
       callback({ ok: true, roomCode: room.code, playerId: socket.id });
@@ -1071,7 +1091,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const name = (nickname || '').trim() || `Player ${room.players.length + 1}`;
+    const name = sanitizeInput(nickname, 20) || `Player ${room.players.length + 1}`;
     const nameLower = name.toLowerCase();
 
     const disconnectedPlayer = room.players.find(
@@ -1198,7 +1218,7 @@ io.on('connection', (socket) => {
       room.options.maxRounds = options.maxRounds;
     }
     if (typeof options.category === 'string') {
-      room.options.category = options.category;
+      room.options.category = sanitizeInput(options.category, 50);
     }
     if (typeof options.clueTimeLimit === 'number' && options.clueTimeLimit >= 0 && options.clueTimeLimit <= 300) {
       room.options.clueTimeLimit = options.clueTimeLimit;
@@ -1210,8 +1230,8 @@ io.on('connection', (socket) => {
       const raw = typeof options.customWords === 'string' ? options.customWords : String(options.customWords || '');
       room.options.customWords = raw
         .split(/[,\n]+/)
-        .map((w) => w.trim())
-        .filter(Boolean);
+        .map((w) => sanitizeInput(w, 100)) // Sanitize each word
+        .filter(w => w && w.trim()); // Filter empty strings and whitespace-only
     }
     broadcastRoomState(room);
   });
@@ -1277,6 +1297,16 @@ io.on('connection', (socket) => {
     if (!room || room.phase !== 'voting') return;
     const player = room.players.find((p) => p.id === socket.id && p.alive);
     if (!player) return;
+    
+    // Prevent voting for yourself (illogical)
+    if (targetId === player.id) {
+      const socket = io.sockets.sockets.get(player.id);
+      if (socket) {
+        socket.emit('errorMessage', 'You cannot vote for yourself!');
+      }
+      return;
+    }
+    
     submitVoteForPlayer(room, player.id, targetId);
   });
 
