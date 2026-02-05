@@ -4,6 +4,7 @@ const path = require('path');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const { getRandomWord, getRandomWordFromList, generateImpostorClue } = require('./words/index');
+const { generateSmartClue } = require('./words/associations');
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMITS = { createRoom: 5, joinRoom: 10, submitClue: 30, submitVote: 30 };
@@ -476,131 +477,20 @@ function generateSmartBotClue(room, bot, clueRound) {
     return cluePool[Math.floor(Math.random() * cluePool.length)];
   }
 
-  // Advanced crewmate strategy: Give specific, varied clues based on the word/theme
+  // Crewmate strategy: Use smart clue generation with word associations
   if (!word || !theme) return 'Related';
 
-  const wordLower = word.toLowerCase();
-  const themeLower = theme.toLowerCase();
-
-  // Generate creative clues based on word characteristics
-  const clues = [];
-
-  // Add theme-based clues with variations
-  clues.push(theme);
-  clues.push(`${theme}!`);
-  clues.push(`It's ${theme}`);
+  // Get all clues this bot has already given to avoid repetition
+  const botPreviousClues = room.clues[bot.id] || [];
   
-  // Add descriptive clues based on word length
-  if (wordLower.length <= 4) {
-    clues.push('Short word');
-    clues.push('Only few letters');
-  } else if (wordLower.length >= 10) {
-    clues.push('Long word');
-    clues.push('Many letters');
-  } else if (wordLower.length >= 6 && wordLower.length <= 9) {
-    clues.push('Medium length');
+  // Try to use smart association-based clue
+  const smartClue = generateSmartClue(word, category, theme, clueRound, botPreviousClues);
+  if (smartClue) {
+    return smartClue;
   }
 
-  // Add letter-based clues
-  const firstLetter = wordLower[0].toUpperCase();
-  const lastLetter = wordLower[wordLower.length - 1].toUpperCase();
-  clues.push(`Starts with ${firstLetter}`);
-  clues.push(`Ends with ${lastLetter}`);
-  clues.push(`${firstLetter}...`);
-  clues.push(`...${lastLetter}`);
-  clues.push(`${firstLetter} to ${lastLetter}`);
-
-  // Add vowel/consonant patterns
-  const vowels = 'aeiou';
-  const vowelCount = wordLower.split('').filter(c => vowels.includes(c)).length;
-  if (vowelCount <= 2) {
-    clues.push('Few vowels');
-  } else if (vowelCount >= 4) {
-    clues.push('Many vowels');
-  }
-
-  // Add syllable/sound clues
-  if (wordLower.includes('oo')) clues.push('Has "oo"');
-  if (wordLower.includes('ee')) clues.push('Has "ee"');
-  if (wordLower.includes('ing')) clues.push('Ends -ing');
-  if (wordLower.includes('er')) clues.push('Has "er"');
-  if (wordLower.includes('tion')) clues.push('Has -tion');
-  if (wordLower.includes('ly')) clues.push('Has "ly"');
-
-  // Add double letter clues
-  for (let i = 0; i < wordLower.length - 1; i++) {
-    if (wordLower[i] === wordLower[i + 1]) {
-      clues.push(`Double ${wordLower[i].toUpperCase()}`);
-      clues.push('Has double letter');
-      break;
-    }
-  }
-
-  // Add category-specific creative clues
-  if (category === 'food') {
-    clues.push('Edible', 'Cuisine', 'You eat this', 'Kitchen', 'Meal', 'Tasty');
-  } else if (category === 'animals') {
-    clues.push('Living being', 'Creature', 'Fauna', 'Wildlife', 'Has life', 'Animal kingdom');
-  } else if (category === 'nature') {
-    clues.push('Natural world', 'Outdoors', 'Environment', 'Earth', 'Nature', 'Outside');
-  } else if (category === 'videogames') {
-    clues.push('Gaming', 'Console/PC', 'Playable', 'Virtual', 'Gamers know', 'Video game');
-  } else if (category === 'music') {
-    clues.push('Audio', 'Musical', 'Sounds', 'Rhythm', 'Artist/Song', 'Melody');
-  } else if (category === 'memes') {
-    clues.push('Internet', 'Viral', 'Online humor', 'Social media', 'Gen Z', 'Meme');
-  } else if (category === 'movies') {
-    clues.push('Cinema', 'Film', 'Screen', 'Hollywood', 'Movie', 'Entertainment');
-  } else if (category === 'anime') {
-    clues.push('Japanese', 'Manga', 'Otaku', 'Animated', 'Eastern', 'Anime');
-  } else if (category === 'technology') {
-    clues.push('Digital', 'Electronic', 'Tech', 'Computer', 'Modern', 'Innovation');
-  } else if (category === 'sports') {
-    clues.push('Athletic', 'Competition', 'Physical', 'Sport', 'Game', 'Team/Solo');
-  } else if (category === 'objects') {
-    clues.push('Thing', 'Item', 'Object', 'Tool', 'Device', 'Everyday');
-  } else if (category === 'places') {
-    clues.push('Location', 'Geography', 'Destination', 'Place', 'Map', 'Travel');
-  } else if (category === 'abstract') {
-    clues.push('Concept', 'Idea', 'Feeling', 'Intangible', 'Mental', 'Abstract');
-  }
-
-  // Add word association clues
-  clues.push(`Think: ${theme}`);
-  clues.push(`Hint: ${theme}`);
-  clues.push(`About ${theme}`);
-  
-  // Second round: more direct and helpful clues (but don't reveal the word)
-  if (clueRound === 2) {
-    clues.push(`Definitely ${theme}`);
-    clues.push(`Obviously ${theme}`);
-    clues.push(`Clearly ${theme}`);
-    clues.push(`100% ${theme}`);
-    clues.push(`${word.length} letters`);
-    clues.push(`${firstLetter}... ${lastLetter}`);
-    clues.push(`${word.length} letter word`);
-    
-    // Add rhyme hints (last 2 letters only, not revealing)
-    const lastTwoLetters = wordLower.slice(-2);
-    clues.push(`Rhymes with ...${lastTwoLetters}`);
-    clues.push(`Ends ...${lastTwoLetters}`);
-    
-    // Add word structure hints
-    if (wordLower.includes(' ')) {
-      clues.push('Multiple words');
-      clues.push('Has space');
-    } else {
-      clues.push('Single word');
-      clues.push('No spaces');
-    }
-    
-    // Add more specific theme clues instead of partial words
-    clues.push(`Very ${theme}`);
-    clues.push(`Totally ${theme}`);
-    clues.push(`Exactly ${theme}`);
-  }
-
-  return clues[Math.floor(Math.random() * clues.length)];
+  // Fallback to theme if smart clue generation fails
+  return theme || 'Related';
 }
 
 function scheduleBotClues(room) {
