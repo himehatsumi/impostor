@@ -11,6 +11,38 @@ const RATE_LIMITS = { createRoom: 5, joinRoom: 10, submitClue: 30, submitVote: 3
 const reconnectGraceMs = 45 * 1000;
 const rateLimitMap = new Map();
 
+// Clean up rate limit map periodically to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamps] of rateLimitMap.entries()) {
+    const filtered = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (filtered.length === 0) {
+      rateLimitMap.delete(key);
+    } else {
+      rateLimitMap.set(key, filtered);
+    }
+  }
+}, RATE_LIMIT_WINDOW_MS);
+
+// Clean up old/abandoned rooms periodically
+const ROOM_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of rooms.entries()) {
+    const allDisconnected = room.players.every(p => p.disconnected);
+    const isOld = now - room.createdAt > ROOM_TIMEOUT_MS;
+    if (allDisconnected || isOld) {
+      // Clean up timers
+      clearPhaseTimer(room);
+      if (room.disconnectTimers) {
+        Object.values(room.disconnectTimers).forEach(timer => clearTimeout(timer));
+      }
+      rooms.delete(code);
+      console.log(`Cleaned up abandoned room: ${code}`);
+    }
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -949,7 +981,19 @@ function endGame(room, impostorWins) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('createRoom', ({ nickname }, callback) => {
+  // Wrap all handlers in try-catch to prevent crashes
+  const safeHandler = (handler) => {
+    return (...args) => {
+      try {
+        handler(...args);
+      } catch (error) {
+        console.error('Error in socket handler:', error);
+        socket.emit('error', { message: 'An error occurred. Please try again.' });
+      }
+    };
+  };
+
+  socket.on('createRoom', safeHandler(({ nickname }, callback) => {
     if (!checkRateLimit(socket.id, 'createRoom')) {
       if (typeof callback === 'function') callback({ ok: false, error: 'Too many rooms created. Please wait.' });
       socket.emit('rateLimit', 'Too many rooms created. Please wait.');
@@ -961,9 +1005,9 @@ io.on('connection', (socket) => {
       callback({ ok: true, roomCode: room.code, playerId: socket.id });
     }
     broadcastRoomState(room);
-  });
+  }));
 
-  socket.on('joinRoom', ({ nickname, roomCode }, callback) => {
+  socket.on('joinRoom', safeHandler(({ nickname, roomCode }, callback) => {
     if (!checkRateLimit(socket.id, 'joinRoom')) {
       if (typeof callback === 'function') callback({ ok: false, error: 'Too many join attempts. Please wait.' });
       socket.emit('rateLimit', 'Too many join attempts. Please wait.');
@@ -1035,7 +1079,7 @@ io.on('connection', (socket) => {
     }
 
     broadcastRoomState(room);
-  });
+  }));
 
   socket.on('startGame', ({ roomCode }) => {
     const room = getRoom(roomCode);
@@ -1251,6 +1295,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    // Clean up rate limit entries for this socket
+    for (const key of rateLimitMap.keys()) {
+      if (key.startsWith(socket.id + ':')) {
+        rateLimitMap.delete(key);
+      }
+    }
+    
     rooms.forEach((room) => {
       const player = room.players.find((p) => p.id === socket.id);
       if (!player) return;
@@ -1272,5 +1323,16 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Impostor game server listening on port ${PORT}`);
+});
+
+// Prevent crashes from unhandled errors
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit, just log it
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit, just log it
 });
 
