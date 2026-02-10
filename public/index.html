@@ -5,8 +5,6 @@
     <title>Impostor - Online Word Game</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="styles.css" />
-    <!-- Socket.IO client from CDN (integrity removed so it always matches) -->
-    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   </head>
   <body>
     <div id="app">
@@ -231,6 +229,8 @@
       </div>
     </div>
 
+    <!-- Load Socket.IO before client.js -->
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" crossorigin="anonymous"></script>
     <script src="client.js"></script>
   </body>
 </html>

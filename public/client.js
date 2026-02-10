@@ -1,6 +1,12 @@
 // Simple front-end controller for the Impostor game.
 // Customize UI text and layout here.
 
+// Check if Socket.IO loaded
+if (typeof io === 'undefined') {
+  alert('Failed to load Socket.IO. Please check your internet connection and refresh the page.');
+  throw new Error('Socket.IO library not loaded');
+}
+
 const socket = io();
 
 let socketConnected = false;
