@@ -52,9 +52,15 @@ const CATEGORIES = {
 function getRandomWord(categoryFilter = null) {
   let filteredWords = WORDS;
   
-  // Filter by category
+  // Filter by category - support multiple categories
   if (categoryFilter && categoryFilter !== 'all') {
-    filteredWords = filteredWords.filter(w => w.category === categoryFilter);
+    // If it's an array of categories, filter to match any of them
+    if (Array.isArray(categoryFilter)) {
+      filteredWords = filteredWords.filter(w => categoryFilter.includes(w.category));
+    } else {
+      // Single category (backward compatibility)
+      filteredWords = filteredWords.filter(w => w.category === categoryFilter);
+    }
   }
   
   if (filteredWords.length === 0) {

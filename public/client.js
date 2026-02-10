@@ -24,7 +24,7 @@ let state = {
   secretWord: null,
   secretTheme: null,
   impostorClue: null,
-  options: { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: '', category: 'all' },
+  options: { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: '', category: 'all', categories: [] },
   timerEndAt: null,
   timerInterval: null,
   wasHost: false,
@@ -251,6 +251,10 @@ function updateRoomState(payload) {
   const me = state.players.find((p) => p.id === state.playerId);
   const isHost = me && me.isHost;
 
+  // SECURITY NOTE: isHost is determined server-side only.
+  // Client cannot manipulate host status - all host actions are validated on the server.
+  // Attempting to modify isHost in console/debugger will have no effect on server permissions.
+
   if (isHost && !state.wasHost && state.roomCode) {
     logStatus('You are now the host.');
   }
@@ -267,7 +271,24 @@ function updateRoomState(payload) {
   optionsPanel.classList.toggle('hidden', !(isHost && payload.phase === 'lobby'));
   if (payload.options && isHost && payload.phase === 'lobby') {
     optMaxRounds.value = String(payload.options.maxRounds ?? 3);
-    optCategory.value = String(payload.options.category ?? 'all');
+    
+    // Update category checkboxes
+    const categories = payload.options.categories || [];
+    const allCheckbox = optCategory.querySelector('input[value="all"]');
+    const categoryCheckboxes = optCategory.querySelectorAll('input[type="checkbox"]:not([value="all"])');
+    
+    if (categories.length === 0) {
+      // All categories selected
+      allCheckbox.checked = true;
+      categoryCheckboxes.forEach(cb => cb.checked = false);
+    } else {
+      // Specific categories selected
+      allCheckbox.checked = false;
+      categoryCheckboxes.forEach(cb => {
+        cb.checked = categories.includes(cb.value);
+      });
+    }
+    
     optClueTime.value = String(payload.options.clueTimeLimit ?? 0);
     optVoteTime.value = String(payload.options.voteTimeLimit ?? 0);
     // Only update custom words if the field is not currently focused (being edited)
@@ -753,11 +774,22 @@ startBotsGameBtn.addEventListener('click', () => {
 function emitRoomOptions() {
   if (!state.roomCode) return;
   const customWords = (optCustomWords && optCustomWords.value) ? optCustomWords.value.trim() : '';
+  
+  // Get selected categories from checkboxes
+  const categoryCheckboxes = optCategory.querySelectorAll('input[type="checkbox"]:checked');
+  const selectedCategories = Array.from(categoryCheckboxes)
+    .map(cb => cb.value)
+    .filter(v => v !== 'all'); // Exclude 'all' from the array
+  
+  // If 'all' is checked or no categories selected, send empty array (means all)
+  const allChecked = optCategory.querySelector('input[value="all"]').checked;
+  const categories = allChecked || selectedCategories.length === 0 ? [] : selectedCategories;
+  
   socket.emit('setRoomOptions', {
     roomCode: state.roomCode,
     options: {
       maxRounds: parseInt(optMaxRounds.value, 10) || 3,
-      category: optCategory.value || 'all',
+      categories: categories,
       clueTimeLimit: parseInt(optClueTime.value, 10) || 0,
       voteTimeLimit: parseInt(optVoteTime.value, 10) || 0,
       customWords: customWords,
@@ -774,7 +806,31 @@ optMaxRounds.addEventListener('input', () => {
   }, 300);
 });
 
-optCategory.addEventListener('change', emitRoomOptions);
+// Category checkbox handling
+optCategory.addEventListener('change', (e) => {
+  if (e.target.type === 'checkbox') {
+    const allCheckbox = optCategory.querySelector('input[value="all"]');
+    const otherCheckboxes = optCategory.querySelectorAll('input[type="checkbox"]:not([value="all"])');
+    
+    // If "All" was clicked
+    if (e.target.value === 'all' && e.target.checked) {
+      // Uncheck all other checkboxes
+      otherCheckboxes.forEach(cb => cb.checked = false);
+    } else if (e.target.value !== 'all' && e.target.checked) {
+      // If any specific category was checked, uncheck "All"
+      allCheckbox.checked = false;
+    }
+    
+    // If no checkboxes are checked, check "All"
+    const anyChecked = Array.from(otherCheckboxes).some(cb => cb.checked);
+    if (!anyChecked && !allCheckbox.checked) {
+      allCheckbox.checked = true;
+    }
+    
+    emitRoomOptions();
+  }
+});
+
 optClueTime.addEventListener('change', emitRoomOptions);
 optVoteTime.addEventListener('change', emitRoomOptions);
 

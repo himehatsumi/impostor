@@ -6,6 +6,35 @@ const { Server } = require('socket.io');
 const { getRandomWord, getRandomWordFromList, generateImpostorClue } = require('./words/index');
 const { generateSmartClue } = require('./words/associations');
 
+/**
+ * SECURITY MEASURES:
+ * 
+ * Host Privilege Protection:
+ * - Host status (isHost) is NEVER accepted from client input
+ * - Host is assigned only when creating a room or when previous host leaves
+ * - All host-privileged actions validate isHost server-side:
+ *   * startGame - requires isHost
+ *   * startGameWithBots - requires isHost
+ *   * setRoomOptions - requires isHost AND lobby phase
+ *   * kickPlayer - requires isHost
+ * - Suspicious host action attempts are logged to console
+ * - Client cannot manipulate host status through console/debugger
+ * 
+ * Input Sanitization:
+ * - All user inputs are sanitized to prevent XSS attacks
+ * - Nicknames, clues, custom words, and categories are filtered
+ * - Input length limits enforced
+ * 
+ * Rate Limiting:
+ * - Room creation, joining, clue submission, and voting are rate-limited
+ * - Prevents spam and abuse
+ * 
+ * Memory Management:
+ * - Rate limit map cleaned periodically
+ * - Old/abandoned rooms deleted after 2 hours
+ * - Disconnect timers and phase timers properly cleared
+ */
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMITS = { createRoom: 5, joinRoom: 10, submitClue: 30, submitVote: 30 };
 const reconnectGraceMs = 45 * 1000;
@@ -122,6 +151,7 @@ function createRoom(hostSocket, nickname) {
       voteTimeLimit: 0,
       customWords: [],
       category: 'all',
+      categories: [], // Multiple category selection
     },
     phaseTimerRef: null,
     disconnectTimers: {},
@@ -787,6 +817,15 @@ function scheduleBotVotes(room) {
   });
 }
 
+function shufflePlayers(room) {
+  // Fisher-Yates shuffle algorithm
+  const players = room.players;
+  for (let i = players.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [players[i], players[j]] = [players[j], players[i]];
+  }
+}
+
 function startNewRound(room) {
   clearPhaseTimer(room);
 
@@ -797,6 +836,11 @@ function startNewRound(room) {
   room.votes = {};
   room.acks = {};
 
+  // Shuffle players at the start of each new game (round 1)
+  if (room.roundNumber === 1) {
+    shufflePlayers(room);
+  }
+
   if (!room.currentWordEntry) {
     const customWords =
       room.options &&
@@ -805,7 +849,9 @@ function startNewRound(room) {
         ? room.options.customWords.filter(w => w && w.trim()) // Filter empty strings
         : null;
 
-    const category = room.options && room.options.category ? room.options.category : 'all';
+    const category = room.options && room.options.categories && room.options.categories.length > 0
+      ? room.options.categories
+      : (room.options && room.options.category ? room.options.category : 'all');
 
     room.currentWordEntry = customWords && customWords.length > 0
       ? getRandomWordFromList(customWords) || getRandomWord(category)
@@ -897,7 +943,22 @@ function advanceClueRoundOrVoting(room) {
       roundNumber: room.roundNumber,
       clueRound: room.clueRound,
     });
-
+    
+    // Auto-acknowledge after 10 seconds
+    room.phaseTimerRef = setTimeout(() => {
+      room.phaseTimerRef = null;
+      if (room.phase !== 'ack') return;
+      
+      // Auto-ack all players who haven't acknowledged yet
+      const alivePlayers = getAliveConnectedPlayers(room);
+      alivePlayers.forEach((p) => {
+        if (!room.acks[p.id]) {
+          room.acks[p.id] = true;
+        }
+      });
+      
+      maybeAdvanceFromAck(room);
+    }, 10000);
     broadcastRoomState(room);
 
     // In case only bots are alive, this will advance immediately.
@@ -1101,7 +1162,13 @@ io.on('connection', (socket) => {
     const room = getRoom(roomCode);
     if (!room) return;
     const player = room.players.find((p) => p.id === socket.id);
-    if (!player || !player.isHost) return;
+    if (!player || !player.isHost) {
+      // Log suspicious activity
+      if (player && !player.isHost) {
+        console.warn(`[SECURITY] Non-host player ${player.name} (${socket.id}) attempted to start game in room ${roomCode}`);
+      }
+      return;
+    }
 
     if (room.players.filter((p) => !p.disconnected).length < 3) {
       ensureMinimumPlayersWithBots(room, 3);
@@ -1132,7 +1199,13 @@ io.on('connection', (socket) => {
     const room = getRoom(roomCode);
     if (!room) return;
     const player = room.players.find((p) => p.id === socket.id);
-    if (!player || !player.isHost) return;
+    if (!player || !player.isHost) {
+      // Log suspicious activity
+      if (player && !player.isHost) {
+        console.warn(`[SECURITY] Non-host player ${player.name} (${socket.id}) attempted to start game with bots in room ${roomCode}`);
+      }
+      return;
+    }
 
     ensureMinimumPlayersWithBots(room, Math.max(3, Math.min(minPlayers, 10)));
 
@@ -1161,14 +1234,27 @@ io.on('connection', (socket) => {
     const room = getRoom(roomCode);
     if (!room) return;
     const player = room.players.find((p) => p.id === socket.id);
-    if (!player || !player.isHost || room.phase !== 'lobby') return;
+    if (!player || !player.isHost || room.phase !== 'lobby') {
+      // Log suspicious activity
+      if (player && !player.isHost) {
+        console.warn(`[SECURITY] Non-host player ${player.name} (${socket.id}) attempted to change room options in room ${roomCode}`);
+      }
+      return;
+    }
 
-    room.options = room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: [], category: 'all' };
+    room.options = room.options || { maxRounds: 3, clueTimeLimit: 0, voteTimeLimit: 0, customWords: [], category: 'all', categories: [] };
     if (typeof options.maxRounds === 'number' && options.maxRounds >= 1 && options.maxRounds <= 20) {
       room.options.maxRounds = options.maxRounds;
     }
     if (typeof options.category === 'string') {
       room.options.category = sanitizeInput(options.category, 50);
+    }
+    // Support multiple categories as array
+    if (Array.isArray(options.categories)) {
+      room.options.categories = options.categories
+        .map(c => sanitizeInput(String(c), 50))
+        .filter(c => c && c.trim())
+        .slice(0, 20); // Max 20 categories
     }
     if (typeof options.clueTimeLimit === 'number' && options.clueTimeLimit >= 0 && options.clueTimeLimit <= 300) {
       room.options.clueTimeLimit = options.clueTimeLimit;
@@ -1199,7 +1285,13 @@ io.on('connection', (socket) => {
     if (!room) return;
     const host = room.players.find((p) => p.id === socket.id);
     const target = room.players.find((p) => p.id === targetId);
-    if (!host || !host.isHost || !target || target.isBot) return;
+    if (!host || !host.isHost || !target || target.isBot) {
+      // Log suspicious activity
+      if (host && !host.isHost) {
+        console.warn(`[SECURITY] Non-host player ${host.name} (${socket.id}) attempted to kick player ${targetId} in room ${roomCode}`);
+      }
+      return;
+    }
     removePlayerFromRoom(room, targetId, 'kick');
   });
 
