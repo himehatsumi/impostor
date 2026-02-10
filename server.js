@@ -817,7 +817,20 @@ function startNewRound(room) {
 
   const alivePlayers = getAliveConnectedPlayers(room);
   if (!room.impostorId) {
-    const impostor = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+    // Anti-repetition: if someone was impostor last game, try to pick someone else
+    const lastImpostorId = room.lastImpostorId;
+    let candidates = alivePlayers;
+    
+    // If there are multiple players and someone was impostor last time, prefer others
+    if (lastImpostorId && alivePlayers.length > 1) {
+      const others = alivePlayers.filter(p => p.id !== lastImpostorId);
+      // 80% chance to pick someone else, 20% chance they can be impostor again
+      if (others.length > 0 && Math.random() < 0.8) {
+        candidates = others;
+      }
+    }
+    
+    const impostor = candidates[Math.floor(Math.random() * candidates.length)];
     room.impostorId = impostor.id;
   }
   room.impostorClue = generateImpostorClue(room.currentWordEntry);
@@ -959,6 +972,9 @@ function tallyVotes(room) {
 function endGame(room, impostorWins) {
   clearPhaseTimer(room);
   room.phase = 'gameover';
+  
+  // Save the impostor ID for anti-repetition in next game
+  room.lastImpostorId = room.impostorId;
 
   // Simple score rule: each surviving winner gets +1.
   room.players.forEach((p) => {
